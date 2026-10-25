@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Keep Talking and Nobody Explodes — A browser-based bomb defusal game. One player sees the bomb, the other reads the manual. Communicate to survive!" />
+    <title>Keep Talking and Nobody Explodes</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&family=Special+Elite&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="/src/css/index.css" />
+    <link rel="stylesheet" href="/src/css/animations.css" />
+    <link rel="stylesheet" href="/src/css/menu.css" />
+    <link rel="stylesheet" href="/src/css/game.css" />
+  </head>
+  <body>
+    <!-- Three.js Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Main Menu Screen -->
+    <div id="menu-screen" class="screen active">
+      <div class="menu-bg-effects">
+        <div class="scanline"></div>
+        <div class="vignette"></div>
+        <div class="particles" id="menu-particles"></div>
+      </div>
+
+      <div class="menu-content">
+        <div class="menu-logo-section">
+          <div class="logo-glow"></div>
+          <h1 class="game-title">
+            <span class="title-line title-keep">KEEP TALKING</span>
+            <span class="title-line title-and">AND</span>
+            <span class="title-line title-nobody">NOBODY EXPLODES</span>
+          </h1>
+          <p class="game-subtitle">A cooperative bomb defusal experience</p>
+        </div>
+
+        <nav class="menu-buttons" id="menu-buttons">
+          <button class="menu-btn primary" id="btn-play" data-sound="click">
+            <span class="btn-icon">💣</span>
+            <span class="btn-text">PLAY</span>
+            <span class="btn-desc">Start a new bomb</span>
+          </button>
+          <button class="menu-btn" id="btn-manual" data-sound="click">
+            <span class="btn-icon">📖</span>
+            <span class="btn-text">EXPERT MANUAL</span>
+            <span class="btn-desc">Read the bomb defusal manual</span>
+          </button>
+          <button class="menu-btn" id="btn-settings" data-sound="click">
+            <span class="btn-icon">⚙️</span>
+            <span class="btn-text">SETTINGS</span>
+            <span class="btn-desc">Difficulty, audio & display</span>
+          </button>
+          <button class="menu-btn" id="btn-how-to-play" data-sound="click">
+            <span class="btn-icon">❓</span>
+            <span class="btn-text">HOW TO PLAY</span>
+            <span class="btn-desc">Learn the basics</span>
+          </button>
+        </nav>
+
+        <div class="menu-footer">
+          <span class="footer-version">v0.1.0 — Phase 1</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Difficulty Selection Screen -->
+    <div id="difficulty-screen" class="screen">
+      <div class="screen-overlay">
+        <div class="difficulty-panel glass-panel">
+          <h2 class="panel-title">SELECT DIFFICULTY</h2>
+          <div class="difficulty-options">
+            <button class="difficulty-btn" data-difficulty="easy" id="diff-easy">
+              <span class="diff-label">EASY</span>
+              <div class="diff-details">
+                <div class="diff-stat"><span class="diff-stat-label">MODULES</span><span class="diff-stat-value">3</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">TIMER</span><span class="diff-stat-value">5:00</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">STRIKES</span><span class="diff-stat-value">3</span></div>
+              </div>
+            </button>
+            <button class="difficulty-btn" data-difficulty="medium" id="diff-medium">
+              <span class="diff-label">MEDIUM</span>
+              <div class="diff-details">
+                <div class="diff-stat"><span class="diff-stat-label">MODULES</span><span class="diff-stat-value">6</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">TIMER</span><span class="diff-stat-value">4:00</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">STRIKES</span><span class="diff-stat-value">3</span></div>
+              </div>
+            </button>
+            <button class="difficulty-btn" data-difficulty="hard" id="diff-hard">
+              <span class="diff-label">HARD</span>
+              <div class="diff-details">
+                <div class="diff-stat"><span class="diff-stat-label">MODULES</span><span class="diff-stat-value">9</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">TIMER</span><span class="diff-stat-value">3:00</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">STRIKES</span><span class="diff-stat-value">2</span></div>
+              </div>
+            </button>
+            <button class="difficulty-btn" data-difficulty="expert" id="diff-expert">
+              <span class="diff-label">EXPERT</span>
+              <div class="diff-details">
+                <div class="diff-stat"><span class="diff-stat-label">MODULES</span><span class="diff-stat-value">11</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">TIMER</span><span class="diff-stat-value">3:00</span></div>
+                <div class="diff-stat"><span class="diff-stat-label">STRIKES</span><span class="diff-stat-value">1</span></div>
+              </div>
+            </button>
+          </div>
+          <button class="back-btn" id="btn-back-to-menu">← BACK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Screen (3D Bomb — no HUD, timer/strikes are on the bomb) -->
+    <div id="game-screen" class="screen">
+      <!-- Interaction hint (shown briefly after pick-up) -->
+      <div class="game-hint" id="game-hint">
+        <span>Drag to rotate • Click a module to inspect • Right-click to put down</span>
+      </div>
+
+      <!-- Module Overlay Container (HTML panels appear here) -->
+      <div class="module-overlay-container" id="module-overlay-container"></div>
+
+      <!-- Game Over Overlay -->
+      <div class="game-over-overlay" id="game-over-overlay" style="display: none;">
+        <h1 class="game-over-title" id="game-over-title"></h1>
+        <p class="game-over-subtitle" id="game-over-subtitle"></p>
+        <div class="game-over-stats" id="game-over-stats"></div>
+        <div class="game-over-actions">
+          <button class="game-over-btn" id="btn-play-again">PLAY AGAIN</button>
+          <button class="game-over-btn game-over-btn-secondary" id="btn-back-menu">BACK TO MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/js/main.js"></script>
+  </body>
+</html>

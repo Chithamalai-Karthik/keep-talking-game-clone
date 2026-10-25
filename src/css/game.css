@@ -1,0 +1,271 @@
+/* ============================================================
+   KTANE Clone — Game Screen Styles
+   Module overlay container, game hints, game-over states
+   (HUD removed — timer/strikes are physically on the 3D bomb)
+   ============================================================ */
+
+/* --- Game Screen --- */
+#game-screen {
+  z-index: var(--z-hud);
+  pointer-events: none;
+}
+
+/* --- Game Hint (shown after picking up bomb) --- */
+.game-hint {
+  position: fixed;
+  bottom: var(--space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-sm) var(--space-xl);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-slow);
+  z-index: var(--z-hud);
+}
+
+.game-hint.visible {
+  opacity: 1;
+}
+
+.game-hint span {
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* --- Module Overlay Container --- */
+.module-overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-overlay);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.module-overlay-container.active {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.module-panel {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  min-width: 350px;
+  max-width: 550px;
+  width: 90vw;
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: fadeInScale var(--transition-slow) ease-out;
+}
+
+.module-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xl);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.module-panel-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: 0.15em;
+}
+
+.module-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.module-close-btn:hover {
+  background: rgba(233, 69, 96, 0.2);
+  border-color: rgba(233, 69, 96, 0.3);
+  color: var(--color-accent-red);
+}
+
+/* --- Game Over Overlay --- */
+.game-over-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  pointer-events: auto;
+  animation: fadeIn var(--transition-slow) ease-out;
+}
+
+.game-over-overlay.explosion {
+  background: radial-gradient(
+    circle at center,
+    rgba(233, 69, 96, 0.3) 0%,
+    rgba(10, 10, 20, 0.95) 60%
+  );
+}
+
+.game-over-overlay.defused {
+  background: radial-gradient(
+    circle at center,
+    rgba(46, 204, 113, 0.2) 0%,
+    rgba(10, 10, 20, 0.95) 60%
+  );
+}
+
+.game-over-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 900;
+  letter-spacing: 0.15em;
+  margin-bottom: var(--space-lg);
+}
+
+.game-over-overlay.explosion .game-over-title {
+  color: var(--color-accent-red);
+  text-shadow: 0 0 40px rgba(233, 69, 96, 0.6);
+}
+
+.game-over-overlay.defused .game-over-title {
+  color: var(--color-accent-green);
+  text-shadow: 0 0 40px rgba(46, 204, 113, 0.6);
+}
+
+.game-over-subtitle {
+  font-family: var(--font-heading);
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2xl);
+}
+
+.game-over-btn {
+  padding: var(--space-md) var(--space-2xl);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.game-over-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.game-over-btn-secondary {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.08);
+  font-size: 0.85rem;
+}
+
+.game-over-actions {
+  display: flex;
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+}
+
+.game-over-stats {
+  display: flex;
+  gap: var(--space-xl);
+  margin-bottom: var(--space-xl);
+}
+
+.game-over-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-md) var(--space-lg);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  min-width: 80px;
+}
+
+.game-over-stat-label {
+  font-family: var(--font-heading);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.game-over-stat-value {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+/* Screen shake for explosion */
+@keyframes screenShake {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-8px, 4px); }
+  20% { transform: translate(6px, -6px); }
+  30% { transform: translate(-4px, 8px); }
+  40% { transform: translate(8px, -2px); }
+  50% { transform: translate(-6px, -4px); }
+  60% { transform: translate(4px, 6px); }
+  70% { transform: translate(-2px, -8px); }
+  80% { transform: translate(6px, 2px); }
+  90% { transform: translate(-4px, -4px); }
+}
+
+.screen-shake {
+  animation: screenShake 0.5s ease-out;
+}
+
+/* --- Responsive --- */
+@media (max-height: 600px) {
+  .game-hint span {
+    font-size: 0.7rem;
+  }
+
+  .game-over-stats {
+    gap: var(--space-md);
+  }
+
+  .game-over-actions {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+}

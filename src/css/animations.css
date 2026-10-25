@@ -1,0 +1,197 @@
+/* ============================================================
+   KTANE Clone — Shared Animations
+   Keyframe animations used across the application
+   ============================================================ */
+
+/* --- Fade In/Out --- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --- Pulse / Glow --- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { 
+    box-shadow: 0 0 10px rgba(233, 69, 96, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(233, 69, 96, 0.6), 0 0 60px rgba(233, 69, 96, 0.2);
+  }
+}
+
+@keyframes pulseGlowAmber {
+  0%, 100% { 
+    box-shadow: 0 0 10px rgba(245, 166, 35, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(245, 166, 35, 0.6), 0 0 60px rgba(245, 166, 35, 0.2);
+  }
+}
+
+@keyframes glowBreath {
+  0%, 100% { 
+    text-shadow: 0 0 10px currentColor;
+  }
+  50% { 
+    text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+}
+
+/* --- Scanline Effect --- */
+@keyframes scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+/* --- Shake (for strikes) --- */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes shakeHard {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  10% { transform: translate(-8px, -2px) rotate(-1deg); }
+  20% { transform: translate(8px, 2px) rotate(1deg); }
+  30% { transform: translate(-6px, -4px) rotate(-0.5deg); }
+  40% { transform: translate(6px, 4px) rotate(0.5deg); }
+  50% { transform: translate(-4px, -2px) rotate(-1deg); }
+  60% { transform: translate(4px, 2px) rotate(1deg); }
+  70% { transform: translate(-2px, -1px) rotate(-0.5deg); }
+  80% { transform: translate(2px, 1px) rotate(0.5deg); }
+  90% { transform: translate(-1px, 0) rotate(0); }
+}
+
+/* --- Slide In --- */
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInBottom {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+/* --- Timer Flash (when time is low) --- */
+@keyframes timerFlash {
+  0%, 100% { color: var(--color-accent-red); }
+  50%      { color: var(--color-accent-red-dim); }
+}
+
+/* --- Strike Flash --- */
+@keyframes strikeFlash {
+  0%   { background-color: var(--color-accent-red); box-shadow: var(--glow-red); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+
+/* --- Button Press Depth --- */
+@keyframes buttonPress {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+/* --- Float (ambient animation) --- */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-10px); }
+}
+
+/* --- Rotate (loading) --- */
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* --- Particle drift --- */
+@keyframes particleDrift {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(50px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* --- Wire Cut --- */
+@keyframes wireCut {
+  0%   { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(0 0 100% 0); }
+}
+
+/* --- Success Checkmark --- */
+@keyframes successPop {
+  0%   { transform: scale(0) rotate(-45deg); opacity: 0; }
+  60%  { transform: scale(1.2) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* --- Explosion (game over) --- */
+@keyframes explosionFlash {
+  0%   { 
+    background: radial-gradient(circle, rgba(245, 166, 35, 0.8) 0%, rgba(233, 69, 96, 0.6) 30%, transparent 70%);
+    opacity: 1;
+  }
+  100% { 
+    background: radial-gradient(circle, rgba(245, 166, 35, 0) 0%, rgba(233, 69, 96, 0) 30%, transparent 70%);
+    opacity: 0;
+  }
+}
