@@ -3,13 +3,14 @@
    Every bomb is random, so each rule is checked across many bombs.
    ============================================================ */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BombState } from '../src/js/game/BombState.js';
 import {
   ACTIVE_MODULES,
   BATTERY_CELLS,
   DIFFICULTY,
   INDICATOR_LABELS,
+  MODULE_TYPES,
   PORT_TYPES,
   WIDGET_MOUNT_COUNT,
 } from '../src/js/utils/constants.js';
@@ -97,7 +98,29 @@ describe('modules and the timer slot', () => {
 
   it('can place the timer in any of the 12 slots', () => {
     const seen = new Set(sampleBombs().map(bomb => bomb.timerSlotId));
+
     expect(seen.size).toBe(12);
+  });
+
+  const face = slotId => slotId.split('-')[0];
+  const buttonsOf = bomb => bomb.modules.filter(module => module.type === MODULE_TYPES.BUTTON);
+
+  it.each(Object.keys(DIFFICULTY))('%s keeps every Button on the timer\'s face', (name) => {
+    for (const bomb of sampleBombs(DIFFICULTY[name])) {
+      buttonsOf(bomb).forEach(({ slotId }) => expect(face(slotId)).toBe(face(bomb.timerSlotId)));
+    }
+  });
+
+  it('swaps out Buttons that do not fit beside the timer', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.4); // Picks Button every time
+    const bomb = new BombState(DIFFICULTY.expert);
+    random.mockRestore();
+
+    const slots = bomb.modules.map(module => module.slotId);
+    expect(bomb.modules).toHaveLength(11);
+    expect(new Set([...slots, bomb.timerSlotId]).size).toBe(12);
+    expect(buttonsOf(bomb)).toHaveLength(5);
+    buttonsOf(bomb).forEach(({ slotId }) => expect(face(slotId)).toBe(face(bomb.timerSlotId)));
   });
 });
 

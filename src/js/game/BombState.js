@@ -9,6 +9,7 @@ import {
   ACTIVE_MODULES,
   BATTERY_CELLS,
   INDICATOR_LABELS,
+  MODULE_TYPES,
   PORT_TYPES,
   WIDGET_MOUNT_COUNT,
 } from '../utils/constants.js';
@@ -121,7 +122,6 @@ export class BombState {
      MODULE ASSIGNMENT — Pick N modules, assign to slot IDs
   ---------------------------------------------------------- */
   _assignModules(moduleCount) {
-    const modules = [];
     const availableTypes = ACTIVE_MODULES;
 
     // 12 slots across both faces: the timer takes a random one, modules fill the rest
@@ -134,18 +134,30 @@ export class BombState {
     const [timerSlotId, ...slotIds] = shuffle(allSlotIds);
     this.timerSlotId = timerSlotId;
 
-    for (let i = 0; i < moduleCount && i < slotIds.length; i++) {
-      // Pick a random module type (allow repeats for larger counts)
-      const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+    // A held Button needs the timer in view, so Buttons share the timer's face
+    const timerFace = timerSlotId.split('-')[0];
+    const buttonSlots = slotIds.filter(id => id.startsWith(timerFace));
+    const otherTypes = availableTypes.filter(type => type !== MODULE_TYPES.BUTTON);
 
-      modules.push({
-        slotId: slotIds[i],
-        type: type,
-        solved: false,
-      });
+    // Pick random module types (allow repeats for larger counts)
+    const pick = types => types[Math.floor(Math.random() * types.length)];
+    const types = [];
+    let buttons = 0;
+    for (let i = 0; i < moduleCount && i < slotIds.length; i++) {
+      let type = pick(availableTypes);
+      if (type === MODULE_TYPES.BUTTON && ++buttons > buttonSlots.length) type = pick(otherTypes);
+      types.push(type);
     }
 
-    return modules;
+    const usedByButtons = new Set(buttonSlots.slice(0, Math.min(buttons, buttonSlots.length)));
+    const openSlots = slotIds.filter(id => !usedByButtons.has(id));
+    const nextButtonSlot = usedByButtons.values();
+
+    return types.map(type => ({
+      slotId: type === MODULE_TYPES.BUTTON ? nextButtonSlot.next().value : openSlots.shift(),
+      type: type,
+      solved: false,
+    }));
   }
 
   /* ----------------------------------------------------------
