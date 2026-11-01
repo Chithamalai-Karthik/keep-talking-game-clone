@@ -32,12 +32,11 @@ Choose **Play**, then a difficulty. The Expert Manual, Settings and How to Play 
 | Control | Action |
 | --- | --- |
 | Left click anywhere on the bomb | Pick it up |
-| Drag | Rotate the held bomb |
-| Left click on a module | Focus it: the bomb turns to face that module |
-| Left click on the focused module | Use it (press, cut and so on) |
+| Left click on a module | Select it: the bomb turns to face that module |
+| Left click on the selected module | Use it (press, cut and so on) |
 | Hold left click on The Button | Hold it down; let go anywhere to release it |
-| Left click on the casing, or drag | Leave the focused module |
-| Right click or Esc | Leave a focused module, or put the bomb down |
+| Hold right click and drag | Rotate the bomb; this keeps the selected module and works during a hold |
+| Right click or Esc | Deselect: leave the selected module, or put the bomb down |
 
 | Difficulty | Modules | Time | Strikes allowed |
 | --- | --- | --- | --- |

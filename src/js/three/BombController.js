@@ -19,6 +19,9 @@ export const BOMB_STATE = {
 // Pixels the mouse must move before a press counts as a drag
 const DRAG_THRESHOLD = 5;
 
+// The right button rotates when dragged and deselects when clicked
+const RIGHT_BUTTON = 2;
+
 export class BombController {
   constructor(bombGroup, camera) {
     this.bomb = bombGroup;
@@ -97,7 +100,7 @@ export class BombController {
   ---------------------------------------------------------- */
 
   onMouseDown(event) {
-    if (event.button !== 0) return; // Left click only
+    if (event.button !== RIGHT_BUTTON) return;
 
     this._isPressed = true;
     this._wasDragged = false;
@@ -116,15 +119,8 @@ export class BombController {
       this._wasDragged = moved > DRAG_THRESHOLD;
     }
 
-    if (!this._isDragging || (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED)) return;
-
-    if (this.state === BOMB_STATE.MODULE_FOCUSED) {
-      if (!this._wasDragged) return;
-
-      // A real drag on a focused module returns to free rotation
-      this.state = BOMB_STATE.HELD;
-      this._focusedSlotId = null;
-    }
+    if (!this._isDragging || !this._wasDragged) return;
+    if (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED) return;
 
     const deltaX = event.clientX - this._previousMouse.x;
     const deltaY = event.clientY - this._previousMouse.y;
@@ -149,10 +145,16 @@ export class BombController {
     this._previousMouse.set(event.clientX, event.clientY);
   }
 
+  /**
+   * @returns {boolean} — true if the right button was clicked, not dragged
+   */
   onMouseUp(event) {
-    if (event.button !== 0) return;
+    if (event.button !== RIGHT_BUTTON) return false;
+
+    const clicked = this._isPressed && !this._wasDragged;
     this._isDragging = false;
     this._isPressed = false;
+    return clicked;
   }
 
   /* ----------------------------------------------------------
@@ -251,6 +253,7 @@ export class BombController {
     // Save current rotation to restore later
     this._preFocusRotation.copy(this._targetRotation);
     this._focusedSlotId = slotId;
+    this._rotationVelocity.set(0, 0);
 
     // Determine target Y rotation to face the module toward camera
     let targetY = 0;
@@ -398,8 +401,8 @@ export class BombController {
       }
     }
 
-    // --- Mouse-drag rotation (only when held, no animation running, not focused) ---
-    if (this.state === BOMB_STATE.HELD && !this._anim) {
+    // --- Mouse-drag rotation (held or focused, no animation running) ---
+    if ((this.state === BOMB_STATE.HELD || this.state === BOMB_STATE.MODULE_FOCUSED) && !this._anim) {
       // Apply momentum when not dragging
       if (!this._isDragging) {
         this._targetRotation.y += this._rotationVelocity.x;

@@ -27,7 +27,7 @@ with a comment saying what it does. ROADMAP.md says what is built and what comes
 | --- | --- |
 | `SceneManager.js` | Three.js scene, camera, renderer, lights and render loop |
 | `BombModel.js` | the 3D bomb: loads the casing and widget models, and builds slots, timer display, strike lights and side panels |
-| `BombController.js` | bomb states and animation: pick up, put down, drag to rotate, focus a module |
+| `BombController.js` | bomb states and animation: pick up, put down, right-drag to rotate, focus a module |
 | `Raycaster.js` | detects clicks and hovers on 3D objects |
 | `ModelLoader.js` | loads and caches `.glb` models exported from Blender, and textures |
 | `TextLabel.js` | flat text labels for widgets and modules |
@@ -70,7 +70,7 @@ with a comment saying what it does. ROADMAP.md says what is built and what comes
 | `BombState.test.js` | bomb generation: serial, batteries, indicators, ports, modules, timer slot, widgets |
 | `timer.test.js` | timer text and strike speed |
 | `ModuleBase.test.js` | module lifecycle, clickable parts, status light and placeholder rules |
-| `BombController.test.js` | resetting the bomb between games |
+| `BombController.test.js` | mouse controls, and resetting the bomb between games |
 | `WiresRules.test.js` | every Wires rule, wire generation and cutting |
 | `ButtonRules.test.js` | tap or hold for every rule, strip digits and release timing |
 | `KeypadRules.test.js` | the symbol columns, one-column key sets and the press order |

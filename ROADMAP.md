@@ -94,14 +94,15 @@ A real game: four 3D modules, won or lost by playing, with core sound effects.
 | 17 | **The Button.** A 3D button with press or hold logic, and a coloured strip that sets the release digit. | L | 2026-12-20 | Built, waiting for the user's play test |
 | 18 | **Keypads.** Four symbol keys pressed in the correct column order. | M | 2026-12-26 | Built, waiting for the user's play test |
 | 44 | **Ports match the manual.** DVI-D, Parallel and Serial get their D-shaped shells and correct pin rows, RJ-45 its notch at the bottom, and Stereo RCA its stacked jacks. | S | 2026-12-26 | Built, waiting for the user's play test |
+| 45 | **Controls match the original.** Left click selects, right click deselects, and holding right click rotates the bomb, even during a Button hold. | S | 2026-12-26 | Built, waiting for the user's play test |
 | 19 | **Simon Says.** Four lit buttons with growing sequences, mapped by strikes and serial vowels. | L | 2027-01-02 | Next |
 | 20 | **Core sound effects.** Timer tick, strike, solve, explosion, and button and wire sounds. | M | 2027-01-09 | Not started |
 
 Decisions for Phase C:
 
-- Module parts can be held (2026-11-01): a module returns true from `onPartPress` to keep a part until the mouse is released, anywhere on the screen. A held part never drags the bomb, and right-click and Escape wait for the release. Leaving the browser window counts as a release.
+- Module parts can be held (2026-11-01): a module returns true from `onPartPress` to keep a part until the mouse is released, anywhere on the screen. Deselecting waits for the release, and leaving the browser window counts as a release.
+- Controls match the original game's options screen (2026-11-01, the user's decision): left click selects, right click deselects, and holding right click rotates. Rotating keeps the selected module, so a Button can be held while the bomb turns. Buttons can land on either face, as in the original, so the timer may need finding during a hold.
 - A press of 0.5 seconds or more counts as a hold, and the strip lights at that point (2026-11-01). The strip's colour is picked again on each press, so a retry after a strike can need a different digit.
-- Every Button shares the timer's face (2026-11-01, the user's decision after a play test), so the timer can be read during a hold. This differs from the original game. Each face has 5 slots beside the timer, so a bomb that rolls more than 5 Buttons gets other modules in their place.
 - The Button has a clear hinged cover, from the user's reference (2026-11-01). It opens by itself while the module is focused, and it never blocks clicks.
 - The 27 Keypads symbols are Unicode characters drawn from the free DejaVu fonts (2026-11-01, the user's decision), not images copied from the original manual, because the repo is public. Their shapes stay close enough that the original manual still works. Each was compared with the manual's symbol, and step 29 must use these same images. The column table was read from the manual by matching each cell against its symbols.
 - A Keypads bomb only uses symbol sets that one column holds (2026-11-01), because some sets of four fit two columns. A wrong press strikes but keeps the keys already pressed.

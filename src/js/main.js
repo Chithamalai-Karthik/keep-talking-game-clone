@@ -94,30 +94,12 @@ class App {
       window.addEventListener('mouseup', (e) => this._onMouseUp(e));
       window.addEventListener('blur', () => this._releaseHeldPart());
 
-      // Right-click to put down bomb
-      canvas.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (this._gameOver || this._heldPart) return;
-        if (this.isGameActive && this.bombController.getState() === BOMB_STATE.HELD) {
-          this.bombController.putDown();
-          this._hideHint();
-        }
-        if (this.isGameActive && this.bombController.getState() === BOMB_STATE.MODULE_FOCUSED) {
-          this._unfocusModule();
-        }
-      });
+      // The right button rotates and deselects, so it never opens the menu
+      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-      // ESC to put down or unfocus + debug shortcuts
+      // ESC to deselect + debug shortcuts
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && this.isGameActive && !this._gameOver && !this._heldPart) {
-          const state = this.bombController.getState();
-          if (state === BOMB_STATE.MODULE_FOCUSED) {
-            this._unfocusModule();
-          } else if (state === BOMB_STATE.HELD) {
-            this.bombController.putDown();
-            this._hideHint();
-          }
-        }
+        if (e.key === 'Escape') this._deselect();
 
         // --- DEBUG SHORTCUTS (development only, active game only) ---
         if (import.meta.env.DEV) {
@@ -486,7 +468,22 @@ class App {
   _onMouseUp(event) {
     if (event.button === 0) this._releaseHeldPart();
     if (this._gameOver) return;
-    this.bombController.onMouseUp(event);
+    if (this.bombController.onMouseUp(event)) this._deselect();
+  }
+
+  /**
+   * Step back one level: leave the focused module, or put the bomb down
+   */
+  _deselect() {
+    if (!this.isGameActive || this._gameOver || this._heldPart) return;
+
+    const state = this.bombController.getState();
+    if (state === BOMB_STATE.MODULE_FOCUSED) {
+      this._unfocusModule();
+    } else if (state === BOMB_STATE.HELD) {
+      this.bombController.putDown();
+      this._hideHint();
+    }
   }
 
   /* ----------------------------------------------------------
@@ -494,7 +491,7 @@ class App {
   ---------------------------------------------------------- */
   _onBombClick(object) {
     if (!this.isGameActive || this._gameOver || this._ignoreClick) return;
-    if (this.bombController.wasDragged() || this.bombController.isAnimating()) return;
+    if (this.bombController.isAnimating()) return;
 
     const state = this.bombController.getState();
 
@@ -514,11 +511,9 @@ class App {
       return;
     }
 
-    // STATE: Module focused → clicking a part uses it, clicking away unfocuses
-    if (state === BOMB_STATE.MODULE_FOCUSED) {
-      if (!slotId) {
-        this._unfocusModule();
-      } else if (slotId !== this.bombController.getFocusedSlotId()) {
+    // STATE: Module focused → clicking a part uses it, clicking another module selects that
+    if (state === BOMB_STATE.MODULE_FOCUSED && slotId) {
+      if (slotId !== this.bombController.getFocusedSlotId()) {
         this._focusModule(slotId);
       } else if (object.userData.type === 'modulePart') {
         this.moduleManager.handlePartClick(slotId, object.userData.partId);
