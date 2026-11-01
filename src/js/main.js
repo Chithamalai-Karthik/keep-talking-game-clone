@@ -16,6 +16,8 @@ import { BombState } from './game/BombState.js';
 import { ModuleManager } from './game/ModuleManager.js';
 import './game/PlaceholderModule.js'; // Register placeholder modules
 import './game/WiresModule.js';
+import './game/ButtonModule.js';
+import './game/KeypadModule.js';
 
 class App {
   constructor() {
@@ -32,6 +34,8 @@ class App {
     this.currentDifficulty = null;
     this.bombState = null;
     this._hintTimeout = null;
+    this._heldPart = null;           // { slotId, partId } while a module part is held down
+    this._ignoreClick = false;       // The click that ends a hold is not a click on the bomb
 
     // Timer state (wall-clock based — runs even when tab is backgrounded)
     this._timerSpeed = 1.0;          // Speed multiplier (increases on strikes)
@@ -88,11 +92,12 @@ class App {
       canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
       canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
       window.addEventListener('mouseup', (e) => this._onMouseUp(e));
+      window.addEventListener('blur', () => this._releaseHeldPart());
 
       // Right-click to put down bomb
       canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        if (this._gameOver) return;
+        if (this._gameOver || this._heldPart) return;
         if (this.isGameActive && this.bombController.getState() === BOMB_STATE.HELD) {
           this.bombController.putDown();
           this._hideHint();
@@ -104,7 +109,7 @@ class App {
 
       // ESC to put down or unfocus + debug shortcuts
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && this.isGameActive && !this._gameOver) {
+        if (e.key === 'Escape' && this.isGameActive && !this._gameOver && !this._heldPart) {
           const state = this.bombController.getState();
           if (state === BOMB_STATE.MODULE_FOCUSED) {
             this._unfocusModule();
@@ -183,6 +188,8 @@ class App {
     if (this.bombState && !this._gameOver) {
       this._updateTimer();
     }
+
+    this.moduleManager?.update(delta, this.bombController.getFocusedSlotId());
   }
 
   /* ----------------------------------------------------------
@@ -324,6 +331,8 @@ class App {
     this.isGameActive = false;
     this._gameOver = false;
     this.bombState = null;
+    this._heldPart = null;
+    this._ignoreClick = false;
     this._timerSpeed = 1.0;
     this._lastDisplayedSecond = -1;
     this._elapsedBeforeSpeedChange = 0;
@@ -433,7 +442,40 @@ class App {
   ---------------------------------------------------------- */
   _onMouseDown(event) {
     if (this._gameOver) return;
+    this._ignoreClick = false;
+    if (this._pressModulePart(event)) return; // A held part must not drag the bomb
     this.bombController.onMouseDown(event);
+  }
+
+  /**
+   * Press a part of the focused module, if the module holds parts
+   * @returns {boolean} — true if a part is now held
+   */
+  _pressModulePart(event) {
+    if (event.button !== 0 || this._heldPart || this.bombController.isAnimating()) return false;
+    if (this.bombController.getState() !== BOMB_STATE.MODULE_FOCUSED) return false;
+
+    const object = this.raycaster.pick(event);
+    if (object?.userData.type !== 'modulePart') return false;
+
+    const { slotId, partId } = object.userData;
+    if (slotId !== this.bombController.getFocusedSlotId()) return false;
+    if (!this.moduleManager.handlePartPress(slotId, partId)) return false;
+
+    this._heldPart = { slotId, partId };
+    return true;
+  }
+
+  /**
+   * Let go of a held part, wherever the mouse is now
+   */
+  _releaseHeldPart() {
+    if (!this._heldPart) return;
+
+    const { slotId, partId } = this._heldPart;
+    this._heldPart = null;
+    this._ignoreClick = true;
+    if (!this._gameOver) this.moduleManager.handlePartRelease(slotId, partId);
   }
 
   _onMouseMove(event) {
@@ -442,6 +484,7 @@ class App {
   }
 
   _onMouseUp(event) {
+    if (event.button === 0) this._releaseHeldPart();
     if (this._gameOver) return;
     this.bombController.onMouseUp(event);
   }
@@ -450,7 +493,7 @@ class App {
      CLICK HANDLER — Pick up bomb or click module slot
   ---------------------------------------------------------- */
   _onBombClick(object) {
-    if (!this.isGameActive || this._gameOver) return;
+    if (!this.isGameActive || this._gameOver || this._ignoreClick) return;
     if (this.bombController.wasDragged() || this.bombController.isAnimating()) return;
 
     const state = this.bombController.getState();

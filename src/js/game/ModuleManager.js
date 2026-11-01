@@ -74,6 +74,31 @@ export class ModuleManager {
   }
 
   /**
+   * Route the mouse going down on a part to the correct module
+   * @returns {boolean} — true if the module holds the part until release
+   */
+  handlePartPress(slotId, partId) {
+    const module = this.modules.get(slotId);
+    return module ? module.handlePartPress(partId) : false;
+  }
+
+  /**
+   * Let go of a part that a module held
+   */
+  handlePartRelease(slotId, partId) {
+    this.modules.get(slotId)?.onPartRelease(partId);
+  }
+
+  /**
+   * Run every module's per-frame update
+   */
+  update(delta, focusedSlotId) {
+    for (const module of this.modules.values()) {
+      module.update(delta, focusedSlotId);
+    }
+  }
+
+  /**
    * Highlight a module part under the mouse
    * @returns {boolean} — true if the part can be clicked
    */

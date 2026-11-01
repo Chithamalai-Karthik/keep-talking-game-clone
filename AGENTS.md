@@ -23,8 +23,7 @@ class with `ModuleManager`. Files open with a banner comment and use `_` for pri
 - **The Expert never gets live bomb data.** It would remove the point of the game: all information passes by voice.
 - **Rotate the bomb, not the camera, and keep the timer and strikes on the bomb** rather than in a HUD.
 - **Model modules in Blender through Blender Lab's official MCP (`mcp` extension plus the `blender-mcp` server), with Blender open.** Don't wait for the user before modelling: they watch if they want to. Models go into the game as `.glb`. The user decided this on 2026-10-31.
-- **Don't copy assets from the original game.** Models, sounds and manual text are made for this project. `references/` holds style references only, and stays out of git.
-- **Commit and push to GitHub at the end of each working day,** so the day's work is never left only on this computer.
+- **Don't copy assets from the original game.** Models, sounds and manual text are made for this project. `references/` holds style references only, and stays out of git.- **Commit and push to GitHub at the end of each working day,** so the day's work is never left only on this computer.
 - **Keep the docs current as you work.** When you add, rename or remove a file, update LAYOUT.md;
   when a feature, command, control or option changes, update the README section that describes it.
 

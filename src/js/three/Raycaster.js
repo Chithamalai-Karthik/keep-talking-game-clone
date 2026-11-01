@@ -136,6 +136,15 @@ export class Raycaster {
     }
   }
 
+  /**
+   * Find the interactive object under a mouse event
+   * @returns {THREE.Object3D|null}
+   */
+  pick(event) {
+    this._updateMouse(event);
+    return this._getIntersection()?.object ?? null;
+  }
+
   _onClick(event) {
     this._updateMouse(event);
 

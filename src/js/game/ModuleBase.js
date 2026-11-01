@@ -7,8 +7,12 @@
    Subclasses provide:
      modelName          — .glb file for the body
      setup()            — create rules and data, before any 3D exists
+     loadAssets()       — optional: load anything else build() needs
      build(body)        — add labels or other details to the loaded body
      onPartClick(id)    — a part was clicked, then call solve() or strike()
+     onPartPress(id)    — optional: a part went down; return true to keep it
+                          until onPartRelease(id), for parts that are held
+     update(delta, focusedSlotId) — optional: runs every frame
 
    Blender objects named part_<id> become clickable parts. A hit_ child
    is an invisible, easier-to-click shape for a thin part.
@@ -67,6 +71,7 @@ export class ModuleBase {
     const [housing, body] = await Promise.all([
       loadModel('module_housing'),
       loadModel(this.modelName),
+      this.loadAssets(),
     ]);
     if (this._disposed) return; // The game ended during loading
 
@@ -76,16 +81,26 @@ export class ModuleBase {
 
     this.root.add(housing, body);
     this.root.traverse((child) => {
-      if (child.isMesh) child.castShadow = true;
+      if (child.isMesh && !child.material.transparent) child.castShadow = true;
     });
     this.slotMesh.add(this.root);
   }
 
   setup() {}
 
+  async loadAssets() {}
+
   build(body) {}
 
   onPartClick(partId) {}
+
+  onPartPress(partId) {
+    return false;
+  }
+
+  onPartRelease(partId) {}
+
+  update(delta, focusedSlotId) {}
 
   /* ----------------------------------------------------------
      PARTS — Named Blender objects that can be clicked
@@ -119,6 +134,15 @@ export class ModuleBase {
     if (this.isSolved || !this.parts.has(partId)) return false;
     this.onPartClick(partId);
     return true;
+  }
+
+  /**
+   * Handle the mouse going down on a part
+   * @returns {boolean} — true if the module holds the part until release
+   */
+  handlePartPress(partId) {
+    if (this.isSolved || !this.parts.has(partId)) return false;
+    return this.onPartPress(partId);
   }
 
   /**

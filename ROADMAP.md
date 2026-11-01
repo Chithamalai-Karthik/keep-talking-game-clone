@@ -91,10 +91,20 @@ A real game: four 3D modules, won or lost by playing, with core sound effects.
 | # | Feature | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
 | 16 | **Wires.** 3 to 6 coloured 3D wires that cut visibly, following the full manual rules. | L | 2026-12-13 | Done 2026-11-01 |
-| 17 | **The Button.** A 3D button with press or hold logic, and a coloured strip that sets the release digit. | L | 2026-12-20 | Next |
-| 18 | **Keypads.** Four symbol keys pressed in the correct column order. | M | 2026-12-26 | Not started |
-| 19 | **Simon Says.** Four lit buttons with growing sequences, mapped by strikes and serial vowels. | L | 2027-01-02 | Not started |
+| 17 | **The Button.** A 3D button with press or hold logic, and a coloured strip that sets the release digit. | L | 2026-12-20 | Built, waiting for the user's play test |
+| 18 | **Keypads.** Four symbol keys pressed in the correct column order. | M | 2026-12-26 | Built, waiting for the user's play test |
+| 44 | **Ports match the manual.** DVI-D, Parallel and Serial get their D-shaped shells and correct pin rows, RJ-45 its notch at the bottom, and Stereo RCA its stacked jacks. | S | 2026-12-26 | Built, waiting for the user's play test |
+| 19 | **Simon Says.** Four lit buttons with growing sequences, mapped by strikes and serial vowels. | L | 2027-01-02 | Next |
 | 20 | **Core sound effects.** Timer tick, strike, solve, explosion, and button and wire sounds. | M | 2027-01-09 | Not started |
+
+Decisions for Phase C:
+
+- Module parts can be held (2026-11-01): a module returns true from `onPartPress` to keep a part until the mouse is released, anywhere on the screen. A held part never drags the bomb, and right-click and Escape wait for the release. Leaving the browser window counts as a release.
+- A press of 0.5 seconds or more counts as a hold, and the strip lights at that point (2026-11-01). The strip's colour is picked again on each press, so a retry after a strike can need a different digit.
+- The Button has a clear hinged cover, from the user's reference (2026-11-01). It opens by itself while the module is focused, and it never blocks clicks.
+- The 27 Keypads symbols are Unicode characters drawn from the free DejaVu fonts (2026-11-01, the user's decision), not images copied from the original manual, because the repo is public. Their shapes stay close enough that the original manual still works. Each was compared with the manual's symbol, and step 29 must use these same images. The column table was read from the manual by matching each cell against its symbols.
+- A Keypads bomb only uses symbol sets that one column holds (2026-11-01), because some sets of four fit two columns. A wrong press strikes but keeps the keys already pressed.
+- Ports follow the manual's Appendix C (2026-11-01). PS/2 stayed as it was: it is the only round plug with a ring of pins, though it lacks the manual's top notch and centre key.
 
 ## Phase D: the complete game for two people
 
