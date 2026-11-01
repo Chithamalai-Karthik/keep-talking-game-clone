@@ -57,21 +57,29 @@ export class ModuleManager {
         this.callbacks
       );
 
+      instance.load().catch((err) => console.error(`[KTANE] Failed to load module at ${mod.slotId}:`, err));
+
       this.modules.set(mod.slotId, instance);
       console.log(`[KTANE] Created module: ${mod.type} at ${mod.slotId}`);
     }
   }
 
   /**
-   * Route a click to the correct module
-   * @param {string} slotId
-   * @param {THREE.Vector3} point — World-space intersection point
+   * Route a click on a part to the correct module
    * @returns {boolean} — true if click was handled
    */
-  handleSlotClick(slotId, point) {
+  handlePartClick(slotId, partId) {
     const module = this.modules.get(slotId);
-    if (!module) return false;
-    return module.handleClick(point);
+    return module ? module.handlePartClick(partId) : false;
+  }
+
+  /**
+   * Highlight a module part under the mouse
+   * @returns {boolean} — true if the part can be clicked
+   */
+  setPartHover(slotId, partId, hovered) {
+    const module = this.modules.get(slotId);
+    return module ? module.setPartHover(partId, hovered) : false;
   }
 
   /**

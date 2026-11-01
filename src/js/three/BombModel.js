@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { loadModel } from './ModelLoader.js';
+import { createTextLabel } from './TextLabel.js';
 
 // Module slot layout constants
 const SLOT_SIZE = 0.9;
@@ -169,6 +170,7 @@ export class BombModel {
         slots.push({
           id: slotId,
           mesh: slotMesh,
+          border: borderMesh,
           position: new THREE.Vector3(x, y, 0),
           normal: new THREE.Vector3(),
           face: facePrefix,
@@ -384,29 +386,10 @@ export class BombModel {
   /**
    * Flat text label for a widget, in the widget's own space
    */
-  _createLabel(text, width, height, { color, background, font }) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = Math.round(512 * (height / width));
-    const ctx = canvas.getContext('2d');
-
-    if (background) {
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    ctx.fillStyle = color;
-    ctx.font = font;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: !background });
-    const geometry = new THREE.PlaneGeometry(width, height);
-    this._widgetDisposables.push(texture, material, geometry);
-
-    return new THREE.Mesh(geometry, material);
+  _createLabel(text, width, height, style) {
+    const label = createTextLabel(text, width, height, style);
+    this._widgetDisposables.push(label.material.map, label.material, label.geometry);
+    return label;
   }
 
   _createWidget(widget, bombState, library) {
@@ -509,6 +492,22 @@ export class BombModel {
     }
   }
 
+  /**
+   * Take everything from the last game off the bomb
+   */
+  clearBomb() {
+    this._widgetRequest++; // Widgets still loading are no longer wanted
+    this._clearWidgets();
+
+    this.moduleSlots.forEach((slot) => {
+      this.setSlotActive(slot.id, false);
+      this.setSlotHighlight(slot.id, false);
+    });
+    this.strikeMeshes.forEach((_, i) => this.setStrike(i, false));
+    this.updateTimerDisplay('5:00');
+    this.hideOutline();
+  }
+
   /* ----------------------------------------------------------
      PUBLIC API
   ---------------------------------------------------------- */
@@ -540,6 +539,15 @@ export class BombModel {
     const slot = this.getSlotById(slotId);
     if (!slot) return;
     slot.isActive = active;
+  }
+
+  /**
+   * Light up a slot's border under the mouse
+   */
+  setSlotHighlight(slotId, highlighted) {
+    const { material } = this.getSlotById(slotId).border;
+    material.emissive.setHex(highlighted ? 0x3a86ff : 0x000000);
+    material.emissiveIntensity = highlighted ? 0.5 : 0;
   }
 
   /**

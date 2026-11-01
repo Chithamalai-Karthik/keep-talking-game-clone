@@ -62,6 +62,7 @@ export class BombController {
     // --- Module focus state ---
     this._focusedSlotId = null;
     this._preFocusRotation = new THREE.Euler();
+    this._unfocusTimeout = null;
 
     // Set initial state
     this.bomb.position.copy(this.tablePosition);
@@ -72,6 +73,7 @@ export class BombController {
    * Instantly reset bomb and camera to table state (no animation)
    */
   resetToTable() {
+    clearTimeout(this._unfocusTimeout);
     this.state = BOMB_STATE.ON_TABLE;
     this._anim = null;
     this._cameraAnim = null;
@@ -299,7 +301,7 @@ export class BombController {
     this._focusedSlotId = null;
 
     // Brief transition to allow free rotation again
-    setTimeout(() => {
+    this._unfocusTimeout = setTimeout(() => {
       this.state = BOMB_STATE.HELD;
       if (callback) callback();
     }, 100);

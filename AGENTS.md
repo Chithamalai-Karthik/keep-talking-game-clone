@@ -4,8 +4,9 @@ A browser clone of Keep Talking and Nobody Explodes: one player defuses a 3D bom
 
 ## Read first
 
-- **README.md**: how to set it up, run and use it, and **Project layout**: which file controls what. Start there
-  instead of reading the whole codebase, then open only the files the task needs.
+- **README.md**: how to set it up, run and use it.
+- **LAYOUT.md**: which file controls what. Start there instead of reading the whole codebase, then open only the
+  files the task needs.
 - **ROADMAP.md**: what is built, what comes next and the decisions behind each step. It overrides `docs/`, which is
   partly out of date (for example, it describes HTML module overlays).
 
@@ -24,7 +25,7 @@ class with `ModuleManager`. Files open with a banner comment and use `_` for pri
 - **Model modules in Blender through Blender Lab's official MCP (`mcp` extension plus the `blender-mcp` server), with Blender open.** Don't wait for the user before modelling: they watch if they want to. Models go into the game as `.glb`. The user decided this on 2026-10-31.
 - **Don't copy assets from the original game.** Models, sounds and manual text are made for this project. `references/` holds style references only, and stays out of git.
 - **Commit and push to GitHub at the end of each working day,** so the day's work is never left only on this computer.
-- **Keep the docs current as you work.** When you add, rename or remove a file, update README › Project layout;
+- **Keep the docs current as you work.** When you add, rename or remove a file, update LAYOUT.md;
   when a feature, command, control or option changes, update the README section that describes it.
 
 ## Roadmap and board

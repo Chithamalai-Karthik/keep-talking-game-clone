@@ -1,13 +1,28 @@
 /* ============================================================
    ModuleBase.js — Base class for all bomb modules
-   Renders module UI as a canvas texture directly on the bomb face.
-   Handles click detection via UV coordinate mapping.
+   A module is a 3D object in its slot: the shared housing with
+   its status light, plus a body modelled for that module type.
+   Rules live in src/js/game/rules/, away from the 3D.
+
+   Subclasses provide:
+     modelName          — .glb file for the body
+     setup()            — create rules and data, before any 3D exists
+     build(body)        — add labels or other details to the loaded body
+     onPartClick(id)    — a part was clicked, then call solve() or strike()
+
+   Blender objects named part_<id> become clickable parts. A hit_ child
+   is an invisible, easier-to-click shape for a thin part.
    ============================================================ */
 
 import * as THREE from 'three';
+import { loadModel } from '../three/ModelLoader.js';
 
-// Canvas resolution for module rendering
-const CANVAS_SIZE = 512;
+const STATUS_SOLVED_COLOR = 0x2ecc71;
+const STATUS_STRIKE_COLOR = 0xe94560;
+const STATUS_INTENSITY = 0.8;
+const STRIKE_FLASH_MS = 500;
+const PART_HOVER_COLOR = 0x3a86ff;
+const PART_HOVER_INTENSITY = 0.5;
 
 export class ModuleBase {
   /**
@@ -25,146 +40,123 @@ export class ModuleBase {
     this.onStrikeCallback = callbacks.onStrike || null;
 
     this.isSolved = false;
-    this.isActive = true;
-
-    // Module display name (override in subclasses)
     this.moduleName = 'MODULE';
+    this.modelName = null;
 
-    // --- Canvas setup ---
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = CANVAS_SIZE;
-    this.canvas.height = CANVAS_SIZE;
-    this.ctx = this.canvas.getContext('2d');
+    this.root = new THREE.Group();
+    this.parts = new Map();
 
-    this.texture = new THREE.CanvasTexture(this.canvas);
-    this.texture.minFilter = THREE.LinearFilter;
-    this.texture.magFilter = THREE.LinearFilter;
-
-    // Apply canvas texture to the slot mesh
-    this._applyTexture();
-
-    // Interactive regions for click detection
-    // Each region: { x, y, width, height, id, onClick }
-    this._clickRegions = [];
-
-    // Initial render
-    this.render();
+    this._statusLight = null;
+    this._statusColor = new THREE.Color();
+    this._strikeTimeout = null;
+    this._disposables = [];
+    this._disposed = false;
   }
 
   /* ----------------------------------------------------------
-     TEXTURE APPLICATION
+     LIFECYCLE — Data first, then models, then show on the bomb
   ---------------------------------------------------------- */
-  _applyTexture() {
-    // Replace the slot mesh's material with one that shows our canvas
-    this._emptySlotMaterial = this.slotMesh.material;
 
-    this.slotMesh.material = new THREE.MeshStandardMaterial({
-      map: this.texture,
-      roughness: 0.8,
-      metalness: 0.1,
-      side: THREE.FrontSide,
+  /**
+   * Set up and build the module. Runs after the subclass constructor,
+   * so subclass fields are ready when setup() and build() are called.
+   */
+  async load() {
+    this.setup();
+
+    const [housing, body] = await Promise.all([
+      loadModel('module_housing'),
+      loadModel(this.modelName),
+    ]);
+    if (this._disposed) return; // The game ended during loading
+
+    this._prepareStatusLight(housing);
+    this._prepareParts(body);
+    this.build(body);
+
+    this.root.add(housing, body);
+    this.root.traverse((child) => {
+      if (child.isMesh) child.castShadow = true;
+    });
+    this.slotMesh.add(this.root);
+  }
+
+  setup() {}
+
+  build(body) {}
+
+  onPartClick(partId) {}
+
+  /* ----------------------------------------------------------
+     PARTS — Named Blender objects that can be clicked
+  ---------------------------------------------------------- */
+  _prepareParts(body) {
+    body.traverse((child) => {
+      if (child.name.startsWith('hit_')) child.visible = false;
+      if (!child.isMesh || !child.name.startsWith('part_')) return;
+
+      const partId = child.name.slice('part_'.length);
+      child.material = this._ownMaterial(child.material);
+      child.userData = { type: 'modulePart', interactive: true, slotId: this.slotId, partId };
+      this.parts.set(partId, child);
     });
   }
 
-  /* ----------------------------------------------------------
-     CLICK DETECTION — Convert 3D hit point to canvas coordinates
-  ---------------------------------------------------------- */
+  /**
+   * Take a part off the module, so it can't be clicked or hovered again
+   */
+  removePart(partId) {
+    this.setPartHover(partId, false);
+    this.parts.get(partId).removeFromParent();
+    this.parts.delete(partId);
+  }
 
   /**
-   * Handle a click on this module's slot
-   * @param {THREE.Vector3} point — World-space intersection point
-   * @returns {boolean} — true if a click region was hit
+   * Handle a click on a part
+   * @returns {boolean} — true if the module took the click
    */
-  handleClick(point) {
-    if (this.isSolved || !this.isActive) return false;
+  handlePartClick(partId) {
+    if (this.isSolved || !this.parts.has(partId)) return false;
+    this.onPartClick(partId);
+    return true;
+  }
 
-    // Convert world point to local slot coordinates
-    const localPoint = this.slotMesh.worldToLocal(point.clone());
+  /**
+   * Highlight a part under the mouse
+   * @returns {boolean} — true if the part can be clicked
+   */
+  setPartHover(partId, hovered) {
+    const part = this.parts.get(partId);
+    if (!part) return false;
 
-    // The slot is a PlaneGeometry centered at origin
-    // localPoint.x ranges from -SLOT_SIZE/2 to +SLOT_SIZE/2
-    // localPoint.y ranges from -SLOT_SIZE/2 to +SLOT_SIZE/2
-    const slotSize = this.slotMesh.geometry.parameters.width;
+    const active = hovered && !this.isSolved;
+    part.material.emissive.setHex(active ? PART_HOVER_COLOR : 0x000000);
+    part.material.emissiveIntensity = active ? PART_HOVER_INTENSITY : 0;
+    return active;
+  }
 
-    // Map to canvas pixel coordinates (0,0 is top-left)
-    const canvasX = ((localPoint.x / slotSize) + 0.5) * CANVAS_SIZE;
-    const canvasY = (0.5 - (localPoint.y / slotSize)) * CANVAS_SIZE;
+  /* ----------------------------------------------------------
+     STATUS LIGHT — Green once solved, red flash on a strike
+  ---------------------------------------------------------- */
+  _prepareStatusLight(housing) {
+    this._statusLight = housing.getObjectByName('status_light');
+    this._statusLight.material = this._ownMaterial(this._statusLight.material);
+    this._statusColor.copy(this._statusLight.material.color);
+  }
 
-    // Check click regions
-    for (const region of this._clickRegions) {
-      if (
-        canvasX >= region.x && canvasX <= region.x + region.width &&
-        canvasY >= region.y && canvasY <= region.y + region.height
-      ) {
-        if (region.onClick) {
-          region.onClick(region.id);
-        }
-        return true;
-      }
+  _setStatusLight(color) {
+    const material = this._statusLight?.material;
+    if (!material) return;
+
+    if (color === null) {
+      material.color.copy(this._statusColor);
+      material.emissive.setHex(0x000000);
+      material.emissiveIntensity = 0;
+    } else {
+      material.color.setHex(color);
+      material.emissive.setHex(color);
+      material.emissiveIntensity = STATUS_INTENSITY;
     }
-
-    return false;
-  }
-
-  /* ----------------------------------------------------------
-     CLICK REGIONS — Subclasses register interactive areas
-  ---------------------------------------------------------- */
-
-  /**
-   * Register a clickable region on the module canvas
-   */
-  addClickRegion(id, x, y, width, height, onClick) {
-    this._clickRegions.push({ id, x, y, width, height, onClick });
-  }
-
-  /**
-   * Clear all click regions (call before re-registering)
-   */
-  clearClickRegions() {
-    this._clickRegions = [];
-  }
-
-  /* ----------------------------------------------------------
-     RENDERING — Override in subclasses
-  ---------------------------------------------------------- */
-
-  /**
-   * Render the module UI to the canvas. Override in subclasses.
-   */
-  render() {
-    // Base render: dark background with module name
-    this._drawBackground();
-    this._drawModuleName();
-    this.texture.needsUpdate = true;
-  }
-
-  /**
-   * Draw the standard dark module background
-   */
-  _drawBackground() {
-    const ctx = this.ctx;
-    const s = CANVAS_SIZE;
-
-    // Dark module background
-    ctx.fillStyle = '#0f1525';
-    ctx.fillRect(0, 0, s, s);
-
-    // Subtle inner border
-    ctx.strokeStyle = '#1a2a4a';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(8, 8, s - 16, s - 16);
-  }
-
-  /**
-   * Draw the module name at the top
-   */
-  _drawModuleName() {
-    const ctx = this.ctx;
-    ctx.fillStyle = '#4a5a7a';
-    ctx.font = 'bold 24px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(this.moduleName, CANVAS_SIZE / 2, 20);
   }
 
   /* ----------------------------------------------------------
@@ -177,12 +169,11 @@ export class ModuleBase {
   solve() {
     if (this.isSolved) return;
     this.isSolved = true;
-    this.isActive = false;
 
-    // Visual: green border on the slot
-    this._showSolvedVisual();
+    clearTimeout(this._strikeTimeout);
+    this._setStatusLight(STATUS_SOLVED_COLOR);
+    this.parts.forEach((_, partId) => this.setPartHover(partId, false));
 
-    // Notify game
     if (this.onSolveCallback) {
       this.onSolveCallback(this.slotId);
     }
@@ -194,10 +185,10 @@ export class ModuleBase {
    * Record a strike from this module
    */
   strike() {
-    // Visual: red flash on the slot
-    this._showStrikeFlash();
+    clearTimeout(this._strikeTimeout);
+    this._setStatusLight(STATUS_STRIKE_COLOR);
+    this._strikeTimeout = setTimeout(() => this._setStatusLight(null), STRIKE_FLASH_MS);
 
-    // Notify game
     if (this.onStrikeCallback) {
       this.onStrikeCallback(this.slotId);
     }
@@ -206,80 +197,24 @@ export class ModuleBase {
   }
 
   /* ----------------------------------------------------------
-     VISUAL FEEDBACK
+     CLEANUP — Model geometry stays cached for the next bomb
   ---------------------------------------------------------- */
 
-  _showSolvedVisual() {
-    // Draw green checkmark overlay on canvas
-    const ctx = this.ctx;
-    const s = CANVAS_SIZE;
-
-    // Semi-transparent green overlay
-    ctx.fillStyle = 'rgba(46, 204, 113, 0.15)';
-    ctx.fillRect(0, 0, s, s);
-
-    // Green border
-    ctx.strokeStyle = '#2ecc71';
-    ctx.lineWidth = 8;
-    ctx.strokeRect(4, 4, s - 8, s - 8);
-
-    // Checkmark
-    ctx.strokeStyle = '#2ecc71';
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(s * 0.3, s * 0.55);
-    ctx.lineTo(s * 0.45, s * 0.7);
-    ctx.lineTo(s * 0.7, s * 0.35);
-    ctx.stroke();
-
-    this.texture.needsUpdate = true;
-
-    // Also update the slot border mesh to green
-    this.slotMesh.traverse((child) => {
-      if (child !== this.slotMesh && child.material && child.material.color) {
-        child.material.color.setHex(0x2ecc71);
-        if (child.material.emissive) {
-          child.material.emissive.setHex(0x2ecc71);
-          child.material.emissiveIntensity = 0.3;
-        }
-      }
-    });
+  /**
+   * Materials are shared between clones, so a module changing one needs its own
+   */
+  _ownMaterial(material) {
+    const own = material.clone();
+    this._disposables.push(own);
+    return own;
   }
 
-  _showStrikeFlash() {
-    // Red flash on border, then revert
-    this.slotMesh.traverse((child) => {
-      if (child !== this.slotMesh && child.material && child.material.color) {
-        const originalColor = child.material.color.getHex();
-        child.material.color.setHex(0xe94560);
-        if (child.material.emissive) {
-          child.material.emissive.setHex(0xe94560);
-          child.material.emissiveIntensity = 0.8;
-        }
-
-        // Revert after 300ms
-        setTimeout(() => {
-          child.material.color.setHex(originalColor);
-          if (child.material.emissive) {
-            child.material.emissive.setHex(0x000000);
-            child.material.emissiveIntensity = 0;
-          }
-        }, 300);
-      }
-    });
-  }
-
-  /* ----------------------------------------------------------
-     CLEANUP
-  ---------------------------------------------------------- */
   dispose() {
-    if (this.texture) this.texture.dispose();
-    this.slotMesh.material.dispose();
-    this.slotMesh.material = this._emptySlotMaterial;
-    this._clickRegions = [];
+    this._disposed = true;
+    clearTimeout(this._strikeTimeout);
+    this.root.removeFromParent();
+    this._disposables.forEach(item => item.dispose());
+    this._disposables = [];
+    this.parts.clear();
   }
 }
-
-export { CANVAS_SIZE };

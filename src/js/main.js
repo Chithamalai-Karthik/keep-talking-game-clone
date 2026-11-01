@@ -9,13 +9,13 @@ import { BombModel } from './three/BombModel.js';
 import { RoomEnvironment } from './three/RoomEnvironment.js';
 import { BombController, BOMB_STATE } from './three/BombController.js';
 import { Raycaster } from './three/Raycaster.js';
-import { loadModel } from './three/ModelLoader.js';
 import { MenuUI } from './ui/MenuUI.js';
 import { DIFFICULTY, strikeSpeed } from './utils/constants.js';
 import { createMenuParticles, displayTime, formatTime } from './utils/helpers.js';
 import { BombState } from './game/BombState.js';
 import { ModuleManager } from './game/ModuleManager.js';
 import './game/PlaceholderModule.js'; // Register placeholder modules
+import './game/WiresModule.js';
 
 class App {
   constructor() {
@@ -32,7 +32,6 @@ class App {
     this.currentDifficulty = null;
     this.bombState = null;
     this._hintTimeout = null;
-    this._testModel = null;
 
     // Timer state (wall-clock based — runs even when tab is backgrounded)
     this._timerSpeed = 1.0;          // Speed multiplier (increases on strikes)
@@ -99,16 +98,16 @@ class App {
           this._hideHint();
         }
         if (this.isGameActive && this.bombController.getState() === BOMB_STATE.MODULE_FOCUSED) {
-          this.bombController.unfocusModule();
+          this._unfocusModule();
         }
       });
 
       // ESC to put down or unfocus + debug shortcuts
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && this.isGameActive) {
+        if (e.key === 'Escape' && this.isGameActive && !this._gameOver) {
           const state = this.bombController.getState();
           if (state === BOMB_STATE.MODULE_FOCUSED) {
-            this.bombController.unfocusModule();
+            this._unfocusModule();
           } else if (state === BOMB_STATE.HELD) {
             this.bombController.putDown();
             this._hideHint();
@@ -340,22 +339,14 @@ class App {
       this.moduleManager = null;
     }
 
-    // Remove the development test model
-    if (this._testModel) {
-      this._testModel.removeFromParent();
-      this._testModel = null;
-    }
-  }
+    // The game-over screen blocks the canvas, so hover never got to end
+    this.bombModel.clearBomb();
+    this.raycaster.clearHover();
 
-  /**
-   * Development check for the Blender pipeline: open the game with
-   * ?modelTest to show the test model on the first module's slot
-   */
-  async _loadTestModel() {
-    const slot = this.bombModel.getSlotById(this.bombState.modules[0].slotId);
-    this._testModel = await loadModel('test_module');
-    slot.mesh.add(this._testModel);
-    console.log(`[KTANE] Test model loaded on ${slot.id}`);
+    const canvas = this.sceneManager.renderer.domElement;
+    canvas.style.cursor = 'default';
+    canvas.classList.remove('screen-shake');
+    this._hideHint();
   }
 
   /* ----------------------------------------------------------
@@ -435,10 +426,6 @@ class App {
       onSolve: (slotId) => this._onModuleSolve(slotId),
       onStrike: (slotId) => this._onModuleStrike(slotId),
     });
-
-    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('modelTest')) {
-      this._loadTestModel();
-    }
   }
 
   /* ----------------------------------------------------------
@@ -462,7 +449,7 @@ class App {
   /* ----------------------------------------------------------
      CLICK HANDLER — Pick up bomb or click module slot
   ---------------------------------------------------------- */
-  _onBombClick(object, point) {
+  _onBombClick(object) {
     if (!this.isGameActive || this._gameOver) return;
     if (this.bombController.wasDragged() || this.bombController.isAnimating()) return;
 
@@ -476,92 +463,89 @@ class App {
       return;
     }
 
-    // STATE: Bomb held → check if they clicked a module slot
+    const slotId = this._findActiveSlotId(object);
+
+    // STATE: Bomb held → first click only inspects the module: rotate bomb to face it
     if (state === BOMB_STATE.HELD) {
-      // Walk up parent chain to find module slot
-      let current = object;
-      while (current) {
-        if (current.userData && current.userData.type === 'moduleSlot' && current.userData.interactive) {
-          const slotId = current.userData.slotId;
-          if (!this.bombModel.isSlotActive(slotId)) break; // Inactive — ignore click
-          const face = slotId.startsWith('front') ? 'front' : 'back';
-
-          console.log(`[KTANE] Clicked module: ${slotId} (${face} face)`);
-
-          // First click only inspects the module: rotate bomb to face it
-          this.bombController.focusModule(face, slotId, () => {
-            console.log(`[KTANE] Module ${slotId} focused`);
-          });
-          return;
-        }
-        current = current.parent;
-      }
+      if (slotId) this._focusModule(slotId);
+      return;
     }
 
-    // STATE: Module focused → clicking the module interacts with it, clicking away unfocuses
+    // STATE: Module focused → clicking a part uses it, clicking away unfocuses
     if (state === BOMB_STATE.MODULE_FOCUSED) {
-      let current = object;
-      let clickedSlotId = null;
-      while (current) {
-        if (current.userData && current.userData.type === 'moduleSlot' && current.userData.interactive) {
-          clickedSlotId = current.userData.slotId;
-          break;
-        }
-        current = current.parent;
-      }
-
-      if (!clickedSlotId || !this.bombModel.isSlotActive(clickedSlotId)) {
-        this.bombController.unfocusModule();
-      } else if (clickedSlotId === this.bombController.getFocusedSlotId()) {
-        // Route click to the module (cut wire, press button, etc.)
-        this.moduleManager.handleSlotClick(clickedSlotId, point);
-      } else {
-        const face = clickedSlotId.startsWith('front') ? 'front' : 'back';
-        this.bombController.focusModule(face, clickedSlotId);
+      if (!slotId) {
+        this._unfocusModule();
+      } else if (slotId !== this.bombController.getFocusedSlotId()) {
+        this._focusModule(slotId);
+      } else if (object.userData.type === 'modulePart') {
+        this.moduleManager.handlePartClick(slotId, object.userData.partId);
+        this.raycaster.refreshHover();
       }
     }
   }
 
+  /**
+   * Walk up from a clicked object to the active module slot holding it
+   * @returns {string|null}
+   */
+  _findActiveSlotId(object) {
+    const slotId = this._findSlotId(object);
+    return slotId && this.bombModel.isSlotActive(slotId) ? slotId : null;
+  }
+
+  _findSlotId(object) {
+    let current = object;
+    while (current) {
+      if (current.userData?.type === 'moduleSlot') return current.userData.slotId;
+      current = current.parent;
+    }
+    return null;
+  }
+
+  _focusModule(slotId) {
+    const face = slotId.startsWith('front') ? 'front' : 'back';
+    console.log(`[KTANE] Clicked module: ${slotId} (${face} face)`);
+
+    this.bombController.focusModule(face, slotId, () => {
+      console.log(`[KTANE] Module ${slotId} focused`);
+      this.raycaster.refreshHover();
+    });
+  }
+
+  _unfocusModule() {
+    this.bombController.unfocusModule(() => this.raycaster.refreshHover());
+  }
+
   /* ----------------------------------------------------------
-     HOVER HANDLERS — Highlight module slots
+     HOVER HANDLERS — Highlight module slots and parts
   ---------------------------------------------------------- */
   _onBombHover(object) {
     if (!this.isGameActive || this._gameOver) return;
     const state = this.bombController.getState();
+    const cursor = this.sceneManager.renderer.domElement.style;
 
     if (state === BOMB_STATE.ON_TABLE) {
       // Show outline glow + pointer cursor
-      this.sceneManager.renderer.domElement.style.cursor = 'pointer';
+      cursor.cursor = 'pointer';
       this.bombModel.showOutline();
       return;
     }
 
-    if (state !== BOMB_STATE.HELD) return;
+    const slotId = this._findActiveSlotId(object);
 
-    // Check if hovering an active module slot
-    let current = object;
-    while (current) {
-      if (current.userData && current.userData.type === 'moduleSlot' && current.userData.interactive) {
-        const slotId = current.userData.slotId;
-        if (!this.bombModel.isSlotActive(slotId)) {
-          // Inactive slot — reset cursor
-          this.sceneManager.renderer.domElement.style.cursor = 'default';
-          return;
-        }
+    if (state === BOMB_STATE.HELD) {
+      cursor.cursor = slotId ? 'pointer' : 'default';
+      if (slotId) this.bombModel.setSlotHighlight(slotId, true);
+      return;
+    }
 
-        // Show pointer cursor + highlight border
-        this.sceneManager.renderer.domElement.style.cursor = 'pointer';
-        current.traverse((child) => {
-          if (child.material && child !== current) {
-            if (child.material.emissive) {
-              child.material.emissive.setHex(0x3a86ff);
-              child.material.emissiveIntensity = 0.5;
-            }
-          }
-        });
-        return;
-      }
-      current = current.parent;
+    if (state === BOMB_STATE.MODULE_FOCUSED) {
+      const focusedSlotId = this.bombController.getFocusedSlotId();
+      const isOtherModule = slotId && slotId !== focusedSlotId;
+      const isPart = object.userData.type === 'modulePart' && slotId === focusedSlotId;
+      const clickable = isPart && this.moduleManager.setPartHover(slotId, object.userData.partId, true);
+      cursor.cursor = clickable || isOtherModule ? 'pointer' : 'default';
+      if (isOtherModule) this.bombModel.setSlotHighlight(slotId, true);
     }
   }
 
@@ -573,22 +557,13 @@ class App {
     // Hide bomb outline
     this.bombModel.hideOutline();
 
-    // Reset any highlighted module slot
-    let current = object;
-    while (current) {
-      if (current.userData && current.userData.type === 'moduleSlot') {
-        current.traverse((child) => {
-          if (child.material && child !== current && !child.userData?.isLed) {
-            if (child.material.emissive) {
-              child.material.emissive.setHex(0x000000);
-              child.material.emissiveIntensity = 0;
-            }
-          }
-        });
-        return;
-      }
-      current = current.parent;
+    if (object.userData.type === 'modulePart') {
+      this.moduleManager?.setPartHover(object.userData.slotId, object.userData.partId, false);
     }
+
+    // Reset any highlighted module slot
+    const slotId = this._findSlotId(object);
+    if (slotId) this.bombModel.setSlotHighlight(slotId, false);
   }
 
   /* ----------------------------------------------------------

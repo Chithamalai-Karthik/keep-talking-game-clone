@@ -89,7 +89,28 @@ export class Raycaster {
 
   _onMouseMove(event) {
     this._updateMouse(event);
+    this._updateHover();
+  }
 
+  /**
+   * Hover again under a still mouse, after what can be hovered has changed
+   */
+  refreshHover() {
+    if (this._hoveredObject && this._onHoverLeaveCallback) {
+      this._onHoverLeaveCallback(this._hoveredObject);
+    }
+    this._hoveredObject = null;
+    this._updateHover();
+  }
+
+  /**
+   * Forget the hovered object without a leave callback, for when it has gone
+   */
+  clearHover() {
+    this._hoveredObject = null;
+  }
+
+  _updateHover() {
     const hit = this._getIntersection();
 
     if (hit) {

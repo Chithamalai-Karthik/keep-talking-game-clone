@@ -1,7 +1,7 @@
 # Keep Talking and Nobody Explodes clone roadmap
 
 The plan for this project: what is built, what comes next and why. The project board (`board/`) shows it as a kanban
-board: `python board/serve.py`. Format: `board/FORMAT.md`. Last updated 31 October 2026.
+board: `python board/serve.py`. Format: `board/FORMAT.md`. Last updated 1 November 2026.
 
 ## About the project
 
@@ -60,16 +60,16 @@ Every problem found in the code review fixed, and a 3D module system ready for r
 | 41 | **Bomb casing modelled in Blender.** The primitive casing, side panels and details are replaced by a Blender model, with slots, timer and strikes still working. | M | 2026-11-28 | Done 2026-10-31 |
 | 42 | **Casing restyled from the reference.** Pale blue-silver rim with rounded corners, a deep dark tray, slim bars, and orange side latches, at the same size. | M | 2026-11-28 | Done 2026-10-31 |
 | 43 | **Timer can be in any slot.** Each bomb picks a random slot for the timer, as in the original game, and modules fill the rest. | S |  | Done 2026-10-31 |
-| 14 | **3D module system.** A module is a 3D object in its slot with clickable parts, with rules kept separate from the 3D so they can be tested. | L | 2026-12-05 | Next |
-| 15 | **Clean replay.** A new game leaves nothing behind from the last one, including when moving to an easier difficulty. | S | 2026-12-06 | Not started |
+| 14 | **3D module system.** A module is a 3D object in its slot with clickable parts, with rules kept separate from the 3D so they can be tested. | L | 2026-12-05 | Done 2026-11-01 |
+| 15 | **Clean replay.** A new game leaves nothing behind from the last one, including when moving to an easier difficulty. | S | 2026-12-06 | Done 2026-11-01 |
 
 Step 14 is built in parts:
 
 | Part | What | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
-| 14a | Module lifecycle that sets up its own data before building or drawing, replacing the canvas `ModuleBase`. | S | 2026-11-29 | Not started |
-| 14b | Clicking and hovering on individual 3D parts of a module. | M | 2026-11-29 | Not started |
-| 14c | Shared module housing with a status light for solved and strike, plus a 3D placeholder module. | S | 2026-12-05 | Not started |
+| 14a | Module lifecycle that sets up its own data before building or drawing, replacing the canvas `ModuleBase`. | S | 2026-11-29 | Done 2026-11-01 |
+| 14b | Clicking and hovering on individual 3D parts of a module. | M | 2026-11-29 | Done 2026-11-01 |
+| 14c | Shared module housing with a status light for solved and strike, plus a 3D placeholder module. | S | 2026-12-05 | Done 2026-11-01 |
 
 Decisions for Phase B:
 
@@ -81,6 +81,7 @@ Decisions for Phase B:
 - Module models are made in Blender through Blender MCP (2026-10-31, the user's decision), and the user watches the modelling live in Blender. Each module's step includes its model, exported as `.glb`.
 - All assets are made for this project, with nothing taken from the original game (2026-10-31, confirmed by the user).
 - Rescheduled (2026-10-31): the user cut the plan to 60 working days on Saturdays and Sundays, with the full scope kept. Effort sizes went from S=1 M=3 L=5 XL=10 to S=1 M=1.5 L=2 XL=4.5, and the end moved from 2028-01-10 to the date in the Schedule line.
+- Module rules live in `src/js/game/rules/`, and Blender objects named `part_<id>` become clickable parts (2026-11-01). The placeholder has green solve and red strike buttons, so a full game can be played before real modules exist.
 - The review's render-before-setup bug is fixed by step 14a rather than on its own, because that step replaces the code it lives in.
 
 ## Phase C: the first playable bomb
@@ -89,8 +90,8 @@ A real game: four 3D modules, won or lost by playing, with core sound effects.
 
 | # | Feature | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
-| 16 | **Wires.** 3 to 6 coloured 3D wires that cut visibly, following the full manual rules. | L | 2026-12-13 | Not started |
-| 17 | **The Button.** A 3D button with press or hold logic, and a coloured strip that sets the release digit. | L | 2026-12-20 | Not started |
+| 16 | **Wires.** 3 to 6 coloured 3D wires that cut visibly, following the full manual rules. | L | 2026-12-13 | Done 2026-11-01 |
+| 17 | **The Button.** A 3D button with press or hold logic, and a coloured strip that sets the release digit. | L | 2026-12-20 | Next |
 | 18 | **Keypads.** Four symbol keys pressed in the correct column order. | M | 2026-12-26 | Not started |
 | 19 | **Simon Says.** Four lit buttons with growing sequences, mapped by strikes and serial vowels. | L | 2027-01-02 | Not started |
 | 20 | **Core sound effects.** Timer tick, strike, solve, explosion, and button and wire sounds. | M | 2027-01-09 | Not started |
