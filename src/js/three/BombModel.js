@@ -5,6 +5,7 @@
    ============================================================ */
 
 import * as THREE from 'three';
+import { loadModel } from './ModelLoader.js';
 
 // Module slot layout constants
 const SLOT_SIZE = 0.9;
@@ -14,18 +15,33 @@ const SLOT_GAP = 0.1;
 const BODY_WIDTH = 3.2;   // X axis (horizontal)
 const BODY_HEIGHT = 2.2;  // Y axis (vertical when standing)
 const BODY_DEPTH = 0.9;   // Z axis (thickness, front-to-back)
+// Blender widget node for each port type
+const PORT_MODELS = {
+  'DVI-D': 'port_dvi_d',
+  'Parallel': 'port_parallel',
+  'PS/2': 'port_ps2',
+  'RJ-45': 'port_rj45',
+  'Serial': 'port_serial',
+  'Stereo RCA': 'port_rca',
+};
+
+const SLOT_PLANE_Z = 0.301; // Tray floor: slots sit recessed inside the rim
 
 export class BombModel {
   constructor() {
     this.group = new THREE.Group();
     this.moduleSlots = [];
-    this.sideInfoMeshes = {};
+    this.widgetMounts = [];
+    this._widgetDisposables = [];
+    this._widgetRequest = 0;
 
     // Timer display
     this.timerCanvas = null;
     this.timerContext = null;
     this.timerTexture = null;
     this.timerMesh = null;
+    this.timerGroup = new THREE.Group();
+    this._timerSlot = null;
 
     // Strike indicators
     this.strikeMeshes = [];
@@ -37,127 +53,74 @@ export class BombModel {
     this._buildModuleSlots();
     this._buildTimerDisplay();
     this._buildStrikeIndicators();
-    this._buildSidePanels();
-    this._buildDecorations();
+    this._buildWidgetMounts();
     this._buildOutline();
+
+    // Shown on the menu; each game picks its own slot
+    this.setTimerSlot('back-4');
   }
 
   /* ----------------------------------------------------------
      BOMB CASING
   ---------------------------------------------------------- */
   _buildCasing() {
-    // Main body
-    const bodyGeo = new THREE.BoxGeometry(BODY_WIDTH, BODY_HEIGHT, BODY_DEPTH, 2, 2, 2);
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a2e,
-      roughness: 0.7,
-      metalness: 0.3,
-      flatShading: true,
-    });
-    this.casingMesh = new THREE.Mesh(bodyGeo, bodyMat);
-    this.casingMesh.castShadow = true;
-    this.casingMesh.receiveShadow = true;
-    this.group.add(this.casingMesh);
-
-    // Edge borders (horizontal strips on top/bottom)
-    const hBorderGeo = new THREE.BoxGeometry(BODY_WIDTH + 0.04, 0.04, BODY_DEPTH + 0.04);
-    const borderMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2a4a,
-      roughness: 0.5,
-      metalness: 0.5,
-      flatShading: true,
-    });
-    const topBorder = new THREE.Mesh(hBorderGeo, borderMat);
-    topBorder.position.y = BODY_HEIGHT / 2;
-    topBorder.castShadow = true;
-    this.group.add(topBorder);
-
-    const bottomBorder = topBorder.clone();
-    bottomBorder.position.y = -BODY_HEIGHT / 2;
-    this.group.add(bottomBorder);
-
-    // Vertical edge borders (left/right)
-    const vBorderGeo = new THREE.BoxGeometry(0.04, BODY_HEIGHT + 0.04, BODY_DEPTH + 0.04);
-    const leftVBorder = new THREE.Mesh(vBorderGeo, borderMat);
-    leftVBorder.position.x = -BODY_WIDTH / 2;
-    this.group.add(leftVBorder);
-
-    const rightVBorder = leftVBorder.clone();
-    rightVBorder.position.x = BODY_WIDTH / 2;
-    this.group.add(rightVBorder);
-
-    // Corner accents (vertical cylinders at corners)
-    const cornerGeo = new THREE.CylinderGeometry(0.05, 0.05, BODY_HEIGHT + 0.08, 8);
-    const cornerMat = new THREE.MeshStandardMaterial({
-      color: 0x3a3a5a,
-      roughness: 0.4,
-      metalness: 0.6,
-      flatShading: true,
-    });
-
-    const hw = BODY_WIDTH / 2;
-    const hd = BODY_DEPTH / 2;
-    [
-      [-hw, 0, -hd], [hw, 0, -hd],
-      [-hw, 0, hd], [hw, 0, hd],
-    ].forEach(([x, y, z]) => {
-      const corner = new THREE.Mesh(cornerGeo, cornerMat);
-      corner.position.set(x, y, z);
-      corner.castShadow = true;
-      this.group.add(corner);
-    });
-
-    // Handle / latch on top
-    const handleBaseGeo = new THREE.BoxGeometry(1.0, 0.06, 0.15);
-    const handleMat = new THREE.MeshStandardMaterial({
-      color: 0x4a4a6a,
-      roughness: 0.3,
-      metalness: 0.7,
-      flatShading: true,
-    });
-    const handle = new THREE.Mesh(handleBaseGeo, handleMat);
-    handle.position.set(0, BODY_HEIGHT / 2 + 0.03, 0);
-    handle.castShadow = true;
-    this.group.add(handle);
+    loadModel('bomb_casing')
+      .then((model) => {
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        model.userData.interactive = true;
+        model.userData.type = 'casing';
+        this.group.add(model);
+      })
+      .catch((err) => console.error('[KTANE] Failed to load bomb casing:', err));
   }
 
   /* ----------------------------------------------------------
-     MODULE SLOTS — Front (6) and Back (5 + timer slot)
+     MODULE SLOTS — Front (6) and Back (6), one holds the timer
   ---------------------------------------------------------- */
   _buildModuleSlots() {
     // Front face: 3 columns × 2 rows = 6 module slots
     const frontSlots = this._createSlotGrid(3, 2, 'front');
     frontSlots.forEach((slot) => {
-      slot.mesh.position.z = BODY_DEPTH / 2 + 0.001;
+      slot.mesh.position.z = SLOT_PLANE_Z;
       slot.normal = new THREE.Vector3(0, 0, 1);
       slot.face = 'front';
       this.group.add(slot.mesh);
       this.moduleSlots.push(slot);
     });
 
-    // Back face: 3 columns × 2 rows = 6 positions
-    // Bottom-center (index 4, row=1 col=1) is reserved for TIMER
-    const backPositions = this._createSlotGrid(3, 2, 'back');
-    backPositions.forEach((slot, i) => {
-      slot.mesh.position.z = -(BODY_DEPTH / 2 + 0.001);
+    // Back face: 3 columns × 2 rows = 6 module slots
+    const backSlots = this._createSlotGrid(3, 2, 'back');
+    backSlots.forEach((slot) => {
+      slot.mesh.position.z = -SLOT_PLANE_Z;
       slot.mesh.rotation.y = Math.PI;
       slot.normal = new THREE.Vector3(0, 0, -1);
       slot.face = 'back';
-
-      // Bottom-center slot (row 1, col 1) = index 4 → timer slot
-      if (i === 4) {
-        slot.isTimerSlot = true;
-        slot.mesh.userData.interactive = false; // Can't click timer
-        slot.mesh.userData.type = 'timerSlot';
-        // We'll add the timer display as a child of this mesh
-        this._timerSlotMesh = slot.mesh;
-      }
-
       this.group.add(slot.mesh);
-      if (!slot.isTimerSlot) {
-        this.moduleSlots.push(slot);
-      }
+      this.moduleSlots.push(slot);
     });
+  }
+
+  /**
+   * Put the timer in a slot. That slot stops being a module slot.
+   */
+  setTimerSlot(slotId) {
+    if (this._timerSlot) {
+      this._timerSlot.isTimerSlot = false;
+      this._timerSlot.mesh.userData.interactive = true;
+      this._timerSlot.mesh.userData.type = 'moduleSlot';
+    }
+
+    const slot = this.getSlotById(slotId);
+    slot.isTimerSlot = true;
+    slot.mesh.userData.interactive = false;
+    slot.mesh.userData.type = 'timerSlot';
+    slot.mesh.add(this.timerGroup);
+    this._timerSlot = slot;
   }
 
   _createSlotGrid(cols, rows, facePrefix) {
@@ -272,9 +235,7 @@ export class BombModel {
     this.timerMesh = new THREE.Mesh(timerGeo, timerMat);
     this.timerMesh.position.set(0, 0.05, 0.003);
 
-    if (this._timerSlotMesh) {
-      this._timerSlotMesh.add(this.timerMesh);
-    }
+    this.timerGroup.add(this.timerMesh);
 
 
 
@@ -361,9 +322,7 @@ export class BombModel {
         0.005
       );
 
-      if (this._timerSlotMesh) {
-        this._timerSlotMesh.add(strikeGroup);
-      }
+      this.timerGroup.add(strikeGroup);
 
       this.strikeMeshes.push({
         group: strikeGroup,
@@ -394,142 +353,106 @@ export class BombModel {
   }
 
   /* ----------------------------------------------------------
-     SIDE PANELS — Serial, batteries, indicators, ports
-     Placed on the narrow sides of the bomb
+     WIDGET MOUNTS — Positions on both sides of each edge's rod
+     Widgets are modelled flat: long side +X, facing +Z
   ---------------------------------------------------------- */
-  _buildSidePanels() {
-    // --- Right side: Serial number plate ---
-    const serialGeo = new THREE.PlaneGeometry(BODY_DEPTH * 0.8, BODY_HEIGHT * 0.2);
-    const serialMat = new THREE.MeshStandardMaterial({
-      color: 0xd4c5a9,
-      roughness: 0.8,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
-    });
-    const serialPlate = new THREE.Mesh(serialGeo, serialMat);
-    serialPlate.position.set(BODY_WIDTH / 2 + 0.03, -0.4, 0);
-    serialPlate.rotation.y = Math.PI / 2;
-    this.group.add(serialPlate);
-    this.sideInfoMeshes.serialPlate = serialPlate;
+  _buildWidgetMounts() {
+    const edges = [
+      { normal: new THREE.Vector3(0, 1, 0), along: new THREE.Vector3(1, 0, 0), distance: BODY_HEIGHT / 2, cells: [-0.8, 0, 0.8] },
+      { normal: new THREE.Vector3(0, -1, 0), along: new THREE.Vector3(1, 0, 0), distance: BODY_HEIGHT / 2, cells: [-0.8, 0, 0.8] },
+      { normal: new THREE.Vector3(1, 0, 0), along: new THREE.Vector3(0, 1, 0), distance: BODY_WIDTH / 2, cells: [-0.34, 0.34] },
+      { normal: new THREE.Vector3(-1, 0, 0), along: new THREE.Vector3(0, 1, 0), distance: BODY_WIDTH / 2, cells: [-0.34, 0.34] },
+    ];
 
-    // --- Left side: Battery holder ---
-    const batteryHolderGeo = new THREE.BoxGeometry(0.05, 0.5, 0.5);
-    const batteryHolderMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2a3e,
-      roughness: 0.6,
-      metalness: 0.4,
-      flatShading: true,
-    });
-    const batteryHolder = new THREE.Mesh(batteryHolderGeo, batteryHolderMat);
-    batteryHolder.position.set(-(BODY_WIDTH / 2 + 0.025), 0.3, 0);
-    batteryHolder.castShadow = true;
-    this.group.add(batteryHolder);
+    for (const { normal, along, distance, cells } of edges) {
+      const across = new THREE.Vector3().crossVectors(normal, along);
+      const rotation = new THREE.Matrix4().makeBasis(along, across, normal);
 
-    // Batteries
-    const batteryGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
-    const batteryMat = new THREE.MeshStandardMaterial({
-      color: 0x3a3a4e,
-      roughness: 0.5,
-      metalness: 0.5,
-    });
-    for (let i = 0; i < 2; i++) {
-      const battery = new THREE.Mesh(batteryGeo, batteryMat);
-      battery.rotation.z = Math.PI / 2;
-      battery.position.set(-(BODY_WIDTH / 2 + 0.06), 0.3, (i - 0.5) * 0.18);
-      this.group.add(battery);
+      for (const cell of cells) {
+        for (const lane of [-0.22, 0.22]) {
+          const mount = new THREE.Group();
+          mount.position.copy(normal).multiplyScalar(distance).addScaledVector(along, cell);
+          mount.position.z += lane;
+          mount.quaternion.setFromRotationMatrix(rotation);
+          this.group.add(mount);
+          this.widgetMounts.push(mount);
+        }
+      }
     }
-
-    // --- Bottom: Port plate ---
-    const portPlateGeo = new THREE.BoxGeometry(1.0, 0.04, 0.3);
-    const portPlateMat = new THREE.MeshStandardMaterial({
-      color: 0x1e2a3e,
-      roughness: 0.7,
-      metalness: 0.3,
-      flatShading: true,
-    });
-    const portPlate = new THREE.Mesh(portPlateGeo, portPlateMat);
-    portPlate.position.set(0.5, -(BODY_HEIGHT / 2 + 0.02), 0);
-    this.group.add(portPlate);
-
-    // Port connectors
-    const portColors = [0x3a86ff, 0xe94560, 0xf5a623];
-    portColors.forEach((color, i) => {
-      const portGeo = new THREE.BoxGeometry(0.18, 0.03, 0.12);
-      const portMat = new THREE.MeshStandardMaterial({
-        color, roughness: 0.5, metalness: 0.4,
-        emissive: color, emissiveIntensity: 0.1,
-      });
-      const port = new THREE.Mesh(portGeo, portMat);
-      port.position.set(0.5 + (i - 1) * 0.28, -(BODY_HEIGHT / 2 + 0.04), 0);
-      this.group.add(port);
-    });
-
-    // --- Right side: Indicator label + LED ---
-    const indicatorGeo = new THREE.PlaneGeometry(0.4, 0.15);
-    const indicatorMat = new THREE.MeshStandardMaterial({
-      color: 0x1a2a3e,
-      roughness: 0.8,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
-    });
-    const indicator = new THREE.Mesh(indicatorGeo, indicatorMat);
-    indicator.position.set(BODY_WIDTH / 2 + 0.001, 0.4, 0);
-    indicator.rotation.y = Math.PI / 2;
-    this.group.add(indicator);
-
-    // Indicator LED
-    const indLedGeo = new THREE.CircleGeometry(0.03, 16);
-    const indLedMat = new THREE.MeshStandardMaterial({
-      color: 0x2ecc71,
-      emissive: 0x2ecc71,
-      emissiveIntensity: 0.8,
-      roughness: 0.3,
-      side: THREE.DoubleSide,
-    });
-    const indLed = new THREE.Mesh(indLedGeo, indLedMat);
-    indLed.position.set(BODY_WIDTH / 2 + 0.002, 0.4, 0.22);
-    indLed.rotation.y = Math.PI / 2;
-    this.group.add(indLed);
-    this.sideInfoMeshes.indicatorLed = indLed;
   }
 
-  /* ----------------------------------------------------------
-     DECORATIONS
-  ---------------------------------------------------------- */
-  _buildDecorations() {
-    // Screws on front face corners
-    const screwGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.02, 6);
-    const screwMat = new THREE.MeshStandardMaterial({
-      color: 0x6a6a8a, roughness: 0.3, metalness: 0.8,
-    });
+  /**
+   * Flat text label for a widget, in the widget's own space
+   */
+  _createLabel(text, width, height, { color, background, font }) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = Math.round(512 * (height / width));
+    const ctx = canvas.getContext('2d');
 
-    const sw = BODY_WIDTH / 2 - 0.08;
-    const sh = BODY_HEIGHT / 2 - 0.08;
-    const sz = BODY_DEPTH / 2 + 0.01;
+    if (background) {
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.fillStyle = color;
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 
-    [
-      [-sw, sh, sz], [sw, sh, sz],
-      [-sw, -sh, sz], [sw, -sh, sz],
-      [-sw, sh, -sz], [sw, sh, -sz],
-      [-sw, -sh, -sz], [sw, -sh, -sz],
-    ].forEach(([x, y, z]) => {
-      const screw = new THREE.Mesh(screwGeo, screwMat);
-      screw.position.set(x, y, z);
-      screw.rotation.x = Math.PI / 2;
-      this.group.add(screw);
-    });
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: !background });
+    const geometry = new THREE.PlaneGeometry(width, height);
+    this._widgetDisposables.push(texture, material, geometry);
 
-    // Warning stripe on left side
-    const stripeGeo = new THREE.PlaneGeometry(0.5, 0.05);
-    const stripeMat = new THREE.MeshStandardMaterial({
-      color: 0xf5a623, roughness: 0.8, metalness: 0.1,
-      emissive: 0xf5a623, emissiveIntensity: 0.15,
-      side: THREE.DoubleSide,
-    });
-    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
-    stripe.position.set(-(BODY_WIDTH / 2 + 0.001), -0.5, 0);
-    stripe.rotation.y = -Math.PI / 2;
-    this.group.add(stripe);
+    return new THREE.Mesh(geometry, material);
+  }
+
+  _createWidget(widget, bombState, library) {
+    const nodeName = {
+      serial: 'serial_tag',
+      battery: widget.size === 'D' ? 'battery_d' : 'battery_aa',
+      indicator: 'indicator',
+      port: PORT_MODELS[widget.port],
+    }[widget.type];
+
+    const object = library.getObjectByName(nodeName).clone(true);
+    object.position.set(0, 0, 0);
+
+    if (widget.type === 'serial') {
+      const serial = this._createLabel(bombState.serial, 0.44, 0.2, { color: '#1a1a2e', font: 'bold 104px monospace' });
+      serial.position.set(0.05, 0, 0.0105);
+      object.add(serial);
+
+      const tab = this._createLabel('SERIAL #', 0.22, 0.08, { color: '#f4efe4', font: 'bold 72px sans-serif' });
+      tab.position.set(-0.23, 0, 0.014);
+      tab.rotation.z = Math.PI / 2;
+      object.add(tab);
+    }
+
+    if (widget.type === 'indicator') {
+      const label = this._createLabel(widget.label, 0.29, 0.13, { color: '#f4efe4', font: 'bold 130px monospace' });
+      label.position.set(0.09, 0, 0.044);
+      object.add(label);
+
+      const lens = object.getObjectByName('indicator_lens');
+      lens.material = lens.material.clone();
+      if (widget.lit) {
+        lens.material.color.setHex(0xfff4d6);
+        lens.material.emissive.setHex(0xfff4d6);
+        lens.material.emissiveIntensity = 2;
+      }
+      this._widgetDisposables.push(lens.material);
+    }
+
+    return object;
+  }
+
+  _clearWidgets() {
+    this.widgetMounts.forEach(mount => mount.clear());
+    this._widgetDisposables.forEach(item => item.dispose());
+    this._widgetDisposables = [];
   }
 
   /* ----------------------------------------------------------
@@ -537,8 +460,8 @@ export class BombModel {
   ---------------------------------------------------------- */
   _buildOutline() {
     const outlineGeo = new THREE.BoxGeometry(
-      BODY_WIDTH + 0.08,
-      BODY_HEIGHT + 0.08,
+      BODY_WIDTH + 0.16,
+      BODY_HEIGHT + 0.16,
       BODY_DEPTH + 0.08
     );
     const outlineMat = new THREE.MeshBasicMaterial({
@@ -567,62 +490,22 @@ export class BombModel {
   }
 
   /* ----------------------------------------------------------
-     BOMB INFO — Update side panels with BombState data
+     BOMB INFO — Show this bomb's widgets on its sides
   ---------------------------------------------------------- */
 
   /**
-   * Update the 3D bomb visuals with generated bomb state info
+   * Replace the widgets with those of a new bomb
    * @param {BombState} bombState
    */
-  updateBombInfo(bombState) {
-    // --- Serial Number on the plate ---
-    const serialPlate = this.sideInfoMeshes.serialPlate;
-    console.log('[KTANE] updateBombInfo called, serialPlate:', !!serialPlate, 'serial:', bombState.serial);
+  async updateBombInfo(bombState) {
+    const request = ++this._widgetRequest;
+    this._clearWidgets();
 
-    if (serialPlate) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 96;
-      const ctx = canvas.getContext('2d');
+    const library = await loadModel('bomb_widgets');
+    if (request !== this._widgetRequest) return; // A newer bomb has started
 
-      // Plate background
-      ctx.fillStyle = '#d4c5a9';
-      ctx.fillRect(0, 0, 256, 96);
-
-      // Border
-      ctx.strokeStyle = '#8a7a5a';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(4, 4, 248, 88);
-
-      // Serial text — large, dark, clear
-      ctx.fillStyle = '#1a1a2e';
-      ctx.font = 'bold 48px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(bombState.serial, 128, 50);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
-
-      // Replace with a new material to ensure the texture applies
-      serialPlate.material.dispose();
-      serialPlate.material = new THREE.MeshStandardMaterial({
-        map: texture,
-        roughness: 0.8,
-        metalness: 0.1,
-        side: THREE.DoubleSide,
-      });
-    }
-
-    // --- Indicator label + LED ---
-    const indLed = this.sideInfoMeshes.indicatorLed;
-    if (indLed && bombState.indicators.length > 0) {
-      const firstInd = bombState.indicators[0];
-      const litColor = firstInd.lit ? 0x2ecc71 : 0x333333;
-      const intensity = firstInd.lit ? 0.8 : 0.1;
-      indLed.material.color.setHex(litColor);
-      indLed.material.emissive.setHex(litColor);
-      indLed.material.emissiveIntensity = intensity;
+    for (const widget of bombState.widgets) {
+      this.widgetMounts[widget.mount].add(this._createWidget(widget, bombState, library));
     }
   }
 
@@ -672,13 +555,6 @@ export class BombModel {
    */
   getInteractiveMeshes() {
     return this.moduleSlots.map(s => s.mesh);
-  }
-
-  /**
-   * Get the bomb casing mesh (for click-to-pick-up detection)
-   */
-  getCasingMesh() {
-    return this.casingMesh;
   }
 
   /**

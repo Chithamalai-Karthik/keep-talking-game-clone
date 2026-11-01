@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Style reference images from the original game (not ours to publish)
+references/
+
+# Blender automatic backups
+*.blend1

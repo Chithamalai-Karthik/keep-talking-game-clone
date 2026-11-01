@@ -9,9 +9,10 @@ import { BombModel } from './three/BombModel.js';
 import { RoomEnvironment } from './three/RoomEnvironment.js';
 import { BombController, BOMB_STATE } from './three/BombController.js';
 import { Raycaster } from './three/Raycaster.js';
+import { loadModel } from './three/ModelLoader.js';
 import { MenuUI } from './ui/MenuUI.js';
-import { DIFFICULTY, SCREENS } from './utils/constants.js';
-import { createMenuParticles } from './utils/helpers.js';
+import { DIFFICULTY, strikeSpeed } from './utils/constants.js';
+import { createMenuParticles, displayTime, formatTime } from './utils/helpers.js';
 import { BombState } from './game/BombState.js';
 import { ModuleManager } from './game/ModuleManager.js';
 import './game/PlaceholderModule.js'; // Register placeholder modules
@@ -31,6 +32,7 @@ class App {
     this.currentDifficulty = null;
     this.bombState = null;
     this._hintTimeout = null;
+    this._testModel = null;
 
     // Timer state (wall-clock based — runs even when tab is backgrounded)
     this._timerSpeed = 1.0;          // Speed multiplier (increases on strikes)
@@ -68,7 +70,7 @@ class App {
       this.bombModel = new BombModel();
       this.sceneManager.add(this.bombModel.getObject());
 
-      // Setup bomb controller (replaces CameraController)
+      // Setup bomb controller
       this.bombController = new BombController(
         this.bombModel.getObject(),
         this.sceneManager.camera
@@ -86,7 +88,7 @@ class App {
       const canvas = this.sceneManager.renderer.domElement;
       canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
       canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
-      canvas.addEventListener('mouseup', (e) => this._onMouseUp(e));
+      window.addEventListener('mouseup', (e) => this._onMouseUp(e));
 
       // Right-click to put down bomb
       canvas.addEventListener('contextmenu', (e) => {
@@ -113,33 +115,35 @@ class App {
           }
         }
 
-        // --- DEBUG SHORTCUTS (active game only) ---
-        if (!this.isGameActive || this._gameOver) return;
-        if (e.key === 't' || e.key === 'T') {
-          // Skip forward 30 seconds
-          this._elapsedBeforeSpeedChange += 30;
-          console.log('[DEBUG] Skipped 30s forward');
-        }
-        if (e.key === 'k' || e.key === 'K') {
-          // Trigger a strike
-          this._onStrike();
-          console.log('[DEBUG] Triggered strike');
-        }
-        if (e.key === 'g' || e.key === 'G') {
-          // Trigger explosion
-          this._onGameOver(false);
-          console.log('[DEBUG] Triggered explosion');
-        }
-        if (e.key === 'w' || e.key === 'W') {
-          // Trigger win
-          this.bombState.modules.forEach(m => m.solved = true);
-          this._onGameOver(true);
-          console.log('[DEBUG] Triggered win');
+        // --- DEBUG SHORTCUTS (development only, active game only) ---
+        if (import.meta.env.DEV) {
+          if (!this.isGameActive || this._gameOver) return;
+          if (e.key === 't' || e.key === 'T') {
+            // Skip forward 30 seconds
+            this._elapsedBeforeSpeedChange += 30;
+            console.log('[DEBUG] Skipped 30s forward');
+          }
+          if (e.key === 'k' || e.key === 'K') {
+            // Trigger a strike
+            this._onStrike();
+            console.log('[DEBUG] Triggered strike');
+          }
+          if (e.key === 'g' || e.key === 'G') {
+            // Trigger explosion
+            this._onGameOver(false);
+            console.log('[DEBUG] Triggered explosion');
+          }
+          if (e.key === 'w' || e.key === 'W') {
+            // Trigger win
+            this.bombState.modules.forEach(m => m.solved = true);
+            this._onGameOver(true);
+            console.log('[DEBUG] Triggered win');
+          }
         }
       });
 
       // --- RAYCASTER SETUP ---
-      this.raycaster.setInteractiveObjects(this.bombModel.getAllMeshes());
+      this.raycaster.setInteractiveObjects([this.bombModel.getObject()]);
 
       this.raycaster.onClick((object, point) => this._onBombClick(object, point));
       this.raycaster.onHover((object) => this._onBombHover(object));
@@ -206,14 +210,7 @@ class App {
     if (currentSecond !== this._lastDisplayedSecond) {
       this._lastDisplayedSecond = currentSecond;
 
-      const minutes = Math.floor(this.bombState.timeRemaining / 60);
-      const seconds = currentSecond % 60;
-      const isDanger = this.bombState.timeRemaining < 60;
-
-      this.bombModel.updateTimerDisplay(
-        `${minutes}:${seconds.toString().padStart(2, '0')}`,
-        isDanger
-      );
+      this.bombModel.updateTimerDisplay(displayTime(currentSecond), currentSecond < 60);
     }
   }
 
@@ -230,8 +227,8 @@ class App {
     this._elapsedBeforeSpeedChange += elapsedSinceSpeedChange;
     this._speedChangeAt = now;
 
-    // Accelerate timer: 1.25x per strike
-    this._timerSpeed = 1.0 + (this.bombState.strikes * 0.25);
+    // Accelerate timer for each strike
+    this._timerSpeed = strikeSpeed(this.bombState.strikes);
     console.log(`[KTANE] STRIKE ${this.bombState.strikes}/${this.bombState.maxStrikes} — Timer speed: ${this._timerSpeed}x`);
 
     if (exploded) {
@@ -271,14 +268,13 @@ class App {
 
     // Stats
     const timeUsed = this.bombState.timeLimit - this.bombState.timeRemaining;
-    const minutes = Math.floor(timeUsed / 60);
-    const seconds = Math.floor(timeUsed % 60);
+    const timeUsedText = formatTime(timeUsed);
     const solvedCount = this.bombState.modules.filter(m => m.solved).length;
 
     statsContainer.innerHTML = `
       <div class="game-over-stat">
         <span class="game-over-stat-label">TIME</span>
-        <span class="game-over-stat-value">${minutes}:${seconds.toString().padStart(2, '0')}</span>
+        <span class="game-over-stat-value">${timeUsedText}</span>
       </div>
       <div class="game-over-stat">
         <span class="game-over-stat-label">STRIKES</span>
@@ -319,7 +315,7 @@ class App {
       this.menuUI.showMainMenu();
     });
 
-    console.log(`[KTANE] ${won ? 'DEFUSED' : 'EXPLOSION'} — Time: ${minutes}:${seconds.toString().padStart(2, '0')}, Strikes: ${this.bombState.strikes}/${this.bombState.maxStrikes}`);
+    console.log(`[KTANE] ${won ? 'DEFUSED' : 'EXPLOSION'} — Time: ${timeUsedText}, Strikes: ${this.bombState.strikes}/${this.bombState.maxStrikes}`);
   }
 
   /**
@@ -343,6 +339,23 @@ class App {
       this.moduleManager.dispose();
       this.moduleManager = null;
     }
+
+    // Remove the development test model
+    if (this._testModel) {
+      this._testModel.removeFromParent();
+      this._testModel = null;
+    }
+  }
+
+  /**
+   * Development check for the Blender pipeline: open the game with
+   * ?modelTest to show the test model on the first module's slot
+   */
+  async _loadTestModel() {
+    const slot = this.bombModel.getSlotById(this.bombState.modules[0].slotId);
+    this._testModel = await loadModel('test_module');
+    slot.mesh.add(this._testModel);
+    console.log(`[KTANE] Test model loaded on ${slot.id}`);
   }
 
   /* ----------------------------------------------------------
@@ -390,7 +403,8 @@ class App {
     this.sceneManager.camera.position.set(0, 3.5, 3.5);
     this.sceneManager.camera.lookAt(0, 0.5, 0);
 
-    // Mark active module slots based on bomb state
+    // Place the timer, then mark active module slots based on bomb state
+    this.bombModel.setTimerSlot(this.bombState.timerSlotId);
     const slots = this.bombModel.getSlots();
     const activeSlotIds = new Set(this.bombState.modules.map(m => m.slotId));
     for (const slot of slots) {
@@ -398,11 +412,7 @@ class App {
     }
 
     // Update timer display on bomb
-    const minutes = Math.floor(this.bombState.timeLimit / 60);
-    const seconds = this.bombState.timeLimit % 60;
-    this.bombModel.updateTimerDisplay(
-      `${minutes}:${seconds.toString().padStart(2, '0')}`
-    );
+    this.bombModel.updateTimerDisplay(formatTime(this.bombState.timeLimit));
 
     // Update bomb side panels with generated info
     this.bombModel.updateBombInfo(this.bombState);
@@ -425,6 +435,10 @@ class App {
       onSolve: (slotId) => this._onModuleSolve(slotId),
       onStrike: (slotId) => this._onModuleStrike(slotId),
     });
+
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('modelTest')) {
+      this._loadTestModel();
+    }
   }
 
   /* ----------------------------------------------------------
@@ -450,6 +464,7 @@ class App {
   ---------------------------------------------------------- */
   _onBombClick(object, point) {
     if (!this.isGameActive || this._gameOver) return;
+    if (this.bombController.wasDragged() || this.bombController.isAnimating()) return;
 
     const state = this.bombController.getState();
 
@@ -473,11 +488,7 @@ class App {
 
           console.log(`[KTANE] Clicked module: ${slotId} (${face} face)`);
 
-          // Route click to the module AND rotate bomb to face it
-          if (this.moduleManager) {
-            this.moduleManager.handleSlotClick(slotId, point);
-          }
-
+          // First click only inspects the module: rotate bomb to face it
           this.bombController.focusModule(face, slotId, () => {
             console.log(`[KTANE] Module ${slotId} focused`);
           });
@@ -499,11 +510,14 @@ class App {
         current = current.parent;
       }
 
-      if (clickedSlotId && this.moduleManager) {
+      if (!clickedSlotId || !this.bombModel.isSlotActive(clickedSlotId)) {
+        this.bombController.unfocusModule();
+      } else if (clickedSlotId === this.bombController.getFocusedSlotId()) {
         // Route click to the module (cut wire, press button, etc.)
         this.moduleManager.handleSlotClick(clickedSlotId, point);
       } else {
-        this.bombController.unfocusModule();
+        const face = clickedSlotId.startsWith('front') ? 'front' : 'back';
+        this.bombController.focusModule(face, clickedSlotId);
       }
     }
   }

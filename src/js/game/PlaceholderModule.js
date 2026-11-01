@@ -6,6 +6,7 @@
 
 import { ModuleBase, CANVAS_SIZE } from './ModuleBase.js';
 import { ModuleManager } from './ModuleManager.js';
+import { ACTIVE_MODULES, MODULE_NAMES } from '../utils/constants.js';
 
 class PlaceholderModule extends ModuleBase {
   constructor(slotId, slotMesh, bombState, callbacks) {
@@ -21,7 +22,7 @@ class PlaceholderModule extends ModuleBase {
 
     // Module type label
     const moduleConfig = this.bombState.modules.find(m => m.slotId === this.slotId);
-    const typeName = moduleConfig ? moduleConfig.type.toUpperCase().replace('_', ' ') : '???';
+    const typeName = moduleConfig ? MODULE_NAMES[moduleConfig.type].toUpperCase() : '???';
 
     // Icon area
     ctx.fillStyle = '#1a2a3e';
@@ -54,9 +55,6 @@ class PlaceholderModule extends ModuleBase {
 }
 
 // Register for all module types as fallback
-ModuleManager.registerModule('wires', PlaceholderModule);
-ModuleManager.registerModule('button', PlaceholderModule);
-ModuleManager.registerModule('keypads', PlaceholderModule);
-ModuleManager.registerModule('simon_says', PlaceholderModule);
+ACTIVE_MODULES.forEach((type) => ModuleManager.registerModule(type, PlaceholderModule));
 
 export { PlaceholderModule };

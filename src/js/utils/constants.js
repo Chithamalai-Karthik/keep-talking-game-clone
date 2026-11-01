@@ -32,8 +32,13 @@ export const NEEDY_MODULE_TYPES = {
   KNOB: 'needy-knob',
 };
 
-// All standard module types in order
-export const STANDARD_MODULES = Object.values(MODULE_TYPES);
+// Module types a bomb can currently contain (grows as modules are built)
+export const ACTIVE_MODULES = [
+  MODULE_TYPES.WIRES,
+  MODULE_TYPES.BUTTON,
+  MODULE_TYPES.KEYPADS,
+  MODULE_TYPES.SIMON_SAYS,
+];
 
 // Module display names
 export const MODULE_NAMES = {
@@ -62,14 +67,20 @@ export const BUTTON_LABELS = ['Abort', 'Detonate', 'Hold', 'Press'];
 
 // Indicator labels
 export const INDICATOR_LABELS = [
-  'SIG', 'FRK', 'CAR', 'IND', 'MSA',
-  'NSA', 'TRN', 'CLR', 'BOB', 'FRQ',
+  'SND', 'CLR', 'CAR', 'IND', 'FRQ',
+  'SIG', 'NSA', 'MSA', 'TRN', 'BOB', 'FRK',
 ];
 
 // Port types
 export const PORT_TYPES = [
   'DVI-D', 'Parallel', 'PS/2', 'RJ-45', 'Serial', 'Stereo RCA',
 ];
+
+// Battery holders: a D holds one cell, an AA holder holds a pair
+export const BATTERY_CELLS = { D: 1, AA: 2 };
+
+// Positions for widgets around the four sides of the bomb
+export const WIDGET_MOUNT_COUNT = 20;
 
 // Password word list (5-letter words)
 export const PASSWORD_WORDS = [
@@ -82,17 +93,12 @@ export const PASSWORD_WORDS = [
   'WHERE', 'WHICH', 'WORLD', 'WOULD', 'WRITE',
 ];
 
-// Timer acceleration after strikes
-export const STRIKE_SPEED_MULTIPLIERS = [1.0, 1.25, 1.5];
+// Timer speeds up by this much for each strike
+const STRIKE_SPEED_STEP = 0.25;
 
-// Game states
-export const GAME_STATE = {
-  MENU: 'menu',
-  DIFFICULTY_SELECT: 'difficulty-select',
-  PLAYING: 'playing',
-  WON: 'won',
-  LOST: 'lost',
-};
+export function strikeSpeed(strikes) {
+  return 1.0 + strikes * STRIKE_SPEED_STEP;
+}
 
 // Screen IDs
 export const SCREENS = {

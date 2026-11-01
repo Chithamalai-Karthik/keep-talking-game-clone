@@ -4,24 +4,14 @@
    and assigns modules to slots based on difficulty.
    ============================================================ */
 
-// All possible indicator labels (from the original game)
-const INDICATOR_LABELS = [
-  'SND', 'CLR', 'CAR', 'IND', 'FRQ',
-  'SIG', 'NSA', 'MSA', 'TRN', 'BOB', 'FRK'
-];
-
-// All possible port types
-const PORT_TYPES = [
-  'DVI-D', 'Parallel', 'PS/2', 'RJ-45', 'Serial', 'Stereo RCA'
-];
-
-// Available module types (will grow as we implement more)
-const MODULE_POOL = [
-  'wires',
-  'button',
-  'keypads',
-  'simon_says',
-];
+import { shuffle } from '../utils/helpers.js';
+import {
+  ACTIVE_MODULES,
+  BATTERY_CELLS,
+  INDICATOR_LABELS,
+  PORT_TYPES,
+  WIDGET_MOUNT_COUNT,
+} from '../utils/constants.js';
 
 export class BombState {
   /**
@@ -30,9 +20,11 @@ export class BombState {
    */
   constructor(config) {
     this.serial = this._generateSerial();
-    this.batteries = this._generateBatteries();
+    this.batteryHolders = this._generateBatteryHolders();
+    this.batteries = this.batteryHolders.reduce((total, type) => total + BATTERY_CELLS[type], 0);
     this.indicators = this._generateIndicators();
     this.ports = this._generatePorts();
+    this.widgets = this._placeWidgets();
 
     // Game rules
     this.timeLimit = config.time;
@@ -82,10 +74,12 @@ export class BombState {
   }
 
   /* ----------------------------------------------------------
-     BATTERIES — 0 to 2 (AA style, in holders on the side)
+     BATTERIES — 0 to 2 holders, each one D cell or a pair of AA
   ---------------------------------------------------------- */
-  _generateBatteries() {
-    return Math.floor(Math.random() * 3); // 0, 1, or 2
+  _generateBatteryHolders() {
+    const count = Math.floor(Math.random() * 3); // 0, 1, or 2
+    const types = Object.keys(BATTERY_CELLS);
+    return Array.from({ length: count }, () => types[Math.floor(Math.random() * types.length)]);
   }
 
   /* ----------------------------------------------------------
@@ -93,8 +87,7 @@ export class BombState {
   ---------------------------------------------------------- */
   _generateIndicators() {
     const count = Math.floor(Math.random() * 4); // 0–3
-    const shuffled = [...INDICATOR_LABELS].sort(() => Math.random() - 0.5);
-    const picked = shuffled.slice(0, count);
+    const picked = shuffle(INDICATOR_LABELS).slice(0, count);
 
     return picked.map(label => ({
       label,
@@ -107,8 +100,21 @@ export class BombState {
   ---------------------------------------------------------- */
   _generatePorts() {
     const count = Math.floor(Math.random() * 4); // 0–3
-    const shuffled = [...PORT_TYPES].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
+    return shuffle(PORT_TYPES).slice(0, count);
+  }
+
+  /* ----------------------------------------------------------
+     WIDGETS — Everything on the bomb's sides, each at a random mount
+  ---------------------------------------------------------- */
+  _placeWidgets() {
+    const widgets = [
+      { type: 'serial' },
+      ...this.batteryHolders.map(size => ({ type: 'battery', size })),
+      ...this.indicators.map(ind => ({ type: 'indicator', ...ind })),
+      ...this.ports.map(port => ({ type: 'port', port })),
+    ];
+    const mounts = shuffle(Array.from({ length: WIDGET_MOUNT_COUNT }, (_, i) => i));
+    return widgets.map((widget, i) => ({ ...widget, mount: mounts[i] }));
   }
 
   /* ----------------------------------------------------------
@@ -116,16 +122,17 @@ export class BombState {
   ---------------------------------------------------------- */
   _assignModules(moduleCount) {
     const modules = [];
-    const availableTypes = [...MODULE_POOL];
+    const availableTypes = ACTIVE_MODULES;
 
-    // Front face slots: front-0 through front-5
-    // Back face slots: back-0 through back-4 (back-5 is timer)
-    const slotIds = [
+    // 12 slots across both faces: the timer takes a random one, modules fill the rest
+    const allSlotIds = [
       'front-0', 'front-1', 'front-2',
       'front-3', 'front-4', 'front-5',
       'back-0', 'back-1', 'back-2',
-      'back-3', 'back-4',
+      'back-3', 'back-4', 'back-5',
     ];
+    const [timerSlotId, ...slotIds] = shuffle(allSlotIds);
+    this.timerSlotId = timerSlotId;
 
     for (let i = 0; i < moduleCount && i < slotIds.length; i++) {
       // Pick a random module type (allow repeats for larger counts)
@@ -203,9 +210,10 @@ export class BombState {
   toString() {
     return [
       `Serial: ${this.serial}`,
-      `Batteries: ${this.batteries}`,
+      `Batteries: ${this.batteries} (${this.batteryHolders.join(', ') || 'no holders'})`,
       `Indicators: ${this.indicators.map(i => `${i.label}(${i.lit ? 'lit' : 'unlit'})`).join(', ') || 'none'}`,
       `Ports: ${this.ports.join(', ') || 'none'}`,
+      `Timer slot: ${this.timerSlotId}`,
       `Modules: ${this.modules.map(m => `${m.slotId}→${m.type}`).join(', ')}`,
       `Time: ${this.timeLimit}s | Strikes: ${this.strikes}/${this.maxStrikes}`,
     ].join('\n');

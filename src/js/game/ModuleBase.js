@@ -56,9 +56,7 @@ export class ModuleBase {
   ---------------------------------------------------------- */
   _applyTexture() {
     // Replace the slot mesh's material with one that shows our canvas
-    if (this.slotMesh.material) {
-      this.slotMesh.material.dispose();
-    }
+    this._emptySlotMaterial = this.slotMesh.material;
 
     this.slotMesh.material = new THREE.MeshStandardMaterial({
       map: this.texture,
@@ -278,6 +276,8 @@ export class ModuleBase {
   ---------------------------------------------------------- */
   dispose() {
     if (this.texture) this.texture.dispose();
+    this.slotMesh.material.dispose();
+    this.slotMesh.material = this._emptySlotMaterial;
     this._clickRegions = [];
   }
 }

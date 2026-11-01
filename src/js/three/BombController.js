@@ -16,6 +16,9 @@ export const BOMB_STATE = {
   MODULE_UNFOCUSING: 'module-unfocusing',
 };
 
+// Pixels the mouse must move before a press counts as a drag
+const DRAG_THRESHOLD = 5;
+
 export class BombController {
   constructor(bombGroup, camera) {
     this.bomb = bombGroup;
@@ -42,6 +45,9 @@ export class BombController {
 
     // --- Mouse drag rotation state ---
     this._isDragging = false;
+    this._isPressed = false;
+    this._wasDragged = false;
+    this._pressStart = new THREE.Vector2();
     this._previousMouse = new THREE.Vector2();
     this._targetRotation = new THREE.Euler(0, 0, 0);
     this._currentRotation = new THREE.Euler(0, 0, 0);
@@ -70,6 +76,8 @@ export class BombController {
     this._anim = null;
     this._cameraAnim = null;
     this._isDragging = false;
+    this._isPressed = false;
+    this._wasDragged = false;
     this._focusedSlotId = null;
     this._targetRotation.set(0, 0, 0);
     this._currentRotation.set(0, 0, 0);
@@ -87,22 +95,34 @@ export class BombController {
   ---------------------------------------------------------- */
 
   onMouseDown(event) {
-    if (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED) return;
     if (event.button !== 0) return; // Left click only
+
+    this._isPressed = true;
+    this._wasDragged = false;
+    this._pressStart.set(event.clientX, event.clientY);
+
+    if (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED) return;
 
     this._isDragging = true;
     this._previousMouse.set(event.clientX, event.clientY);
     this._rotationVelocity.set(0, 0);
-
-    // If focused on a module, unfocus to allow free rotation
-    if (this.state === BOMB_STATE.MODULE_FOCUSED) {
-      this.state = BOMB_STATE.HELD;
-      this._focusedSlotId = null;
-    }
   }
 
   onMouseMove(event) {
+    if (this._isPressed && !this._wasDragged) {
+      const moved = Math.hypot(event.clientX - this._pressStart.x, event.clientY - this._pressStart.y);
+      this._wasDragged = moved > DRAG_THRESHOLD;
+    }
+
     if (!this._isDragging || (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED)) return;
+
+    if (this.state === BOMB_STATE.MODULE_FOCUSED) {
+      if (!this._wasDragged) return;
+
+      // A real drag on a focused module returns to free rotation
+      this.state = BOMB_STATE.HELD;
+      this._focusedSlotId = null;
+    }
 
     const deltaX = event.clientX - this._previousMouse.x;
     const deltaY = event.clientY - this._previousMouse.y;
@@ -130,6 +150,7 @@ export class BombController {
   onMouseUp(event) {
     if (event.button !== 0) return;
     this._isDragging = false;
+    this._isPressed = false;
   }
 
   /* ----------------------------------------------------------
@@ -223,7 +244,7 @@ export class BombController {
    * @param {Function} callback - called when rotation completes
    */
   focusModule(face, slotId, callback = null) {
-    if (this.state !== BOMB_STATE.HELD) return;
+    if (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED) return;
 
     // Save current rotation to restore later
     this._preFocusRotation.copy(this._targetRotation);
@@ -410,6 +431,20 @@ export class BombController {
 
   getState() {
     return this.state;
+  }
+
+  /**
+   * True if the last mouse press moved far enough to be a drag, not a click
+   */
+  wasDragged() {
+    return this._wasDragged;
+  }
+
+  /**
+   * True while the bomb is moving to a new position
+   */
+  isAnimating() {
+    return this._anim !== null;
   }
 
   getFocusedSlotId() {

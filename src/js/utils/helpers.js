@@ -1,7 +1,15 @@
 /* ============================================================
    helpers.js — Utility Functions
-   Random generators, serial number creation, and misc helpers
+   Random helpers, time formatting, and misc helpers
    ============================================================ */
+
+/**
+ * Text the bomb shows for time remaining: partial seconds round up,
+ * so it only reads 0:00 when time has run out
+ */
+export function displayTime(secondsRemaining) {
+  return formatTime(Math.ceil(secondsRemaining));
+}
 
 /**
  * Get a random integer between min (inclusive) and max (inclusive)
@@ -27,54 +35,6 @@ export function shuffle(array) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
-}
-
-/**
- * Generate a random serial number
- * Format: 2 letters, 1 digit, 1 letter, 1 digit, 1 letter-or-digit
- * The last character determines even/odd parity (important for module rules)
- */
-export function generateSerialNumber() {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const digits = '0123456789';
-  const alphanumeric = letters + digits;
-
-  let serial = '';
-  serial += randomChoice(letters);     // Letter
-  serial += randomChoice(letters);     // Letter
-  serial += randomChoice(digits);      // Digit
-  serial += randomChoice(letters);     // Letter
-  serial += randomChoice(digits);      // Digit
-  serial += randomChoice(alphanumeric); // Letter or digit (last char)
-
-  return serial;
-}
-
-/**
- * Check if a serial number has a vowel
- */
-export function serialHasVowel(serial) {
-  return /[AEIOU]/.test(serial);
-}
-
-/**
- * Check if the last digit of a serial is odd
- */
-export function serialLastDigitOdd(serial) {
-  // Find the last digit in the serial
-  for (let i = serial.length - 1; i >= 0; i--) {
-    if (/\d/.test(serial[i])) {
-      return parseInt(serial[i]) % 2 !== 0;
-    }
-  }
-  return false;
-}
-
-/**
- * Check if the last digit of a serial is even
- */
-export function serialLastDigitEven(serial) {
-  return !serialLastDigitOdd(serial);
 }
 
 /**

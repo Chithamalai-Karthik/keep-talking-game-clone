@@ -3,7 +3,7 @@
    Handles menu interactions, screen transitions, and difficulty selection
    ============================================================ */
 
-import { SCREENS, GAME_STATE } from '../utils/constants.js';
+import { SCREENS } from '../utils/constants.js';
 
 export class MenuUI {
   constructor() {
