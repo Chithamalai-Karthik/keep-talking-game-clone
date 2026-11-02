@@ -13,7 +13,7 @@ All game logic runs in the Defuser's browser, with no game server. Voice chat is
 
 ## Schedule
 
-**Schedule:** start 2026-10-31 · end 2027-06-06 · 219 days, 64 working days (7 days a week) · effort S=1 M=1.5 L=2 XL=4.5 working days · off 2026-11-02, 2026-11-03, 2026-11-04, 2026-11-05, 2026-11-06, 2026-11-09, 2026-11-10, 2026-11-11, 2026-11-12, 2026-11-13, 2026-11-16, 2026-11-17, 2026-11-18, 2026-11-19, 2026-11-20, 2026-11-23, 2026-11-24, 2026-11-25, 2026-11-26, 2026-11-27, 2026-11-30, 2026-12-01, 2026-12-02, 2026-12-03, 2026-12-04, 2026-12-07, 2026-12-08, 2026-12-09, 2026-12-10, 2026-12-11, 2026-12-14, 2026-12-15, 2026-12-16, 2026-12-17, 2026-12-18, 2026-12-21, 2026-12-22, 2026-12-23, 2026-12-24, 2026-12-25, 2026-12-28, 2026-12-29, 2026-12-30, 2026-12-31, 2027-01-01, 2027-01-04, 2027-01-05, 2027-01-06, 2027-01-07, 2027-01-08, 2027-01-11, 2027-01-12, 2027-01-13, 2027-01-14, 2027-01-15, 2027-01-18, 2027-01-19, 2027-01-20, 2027-01-21, 2027-01-22, 2027-01-25, 2027-01-26, 2027-01-27, 2027-01-28, 2027-01-29, 2027-02-01, 2027-02-02, 2027-02-03, 2027-02-04, 2027-02-05, 2027-02-08, 2027-02-09, 2027-02-10, 2027-02-11, 2027-02-12, 2027-02-15, 2027-02-16, 2027-02-17, 2027-02-18, 2027-02-19, 2027-02-22, 2027-02-23, 2027-02-24, 2027-02-25, 2027-02-26, 2027-03-01, 2027-03-02, 2027-03-03, 2027-03-04, 2027-03-05, 2027-03-08, 2027-03-09, 2027-03-10, 2027-03-11, 2027-03-12, 2027-03-15, 2027-03-16, 2027-03-17, 2027-03-18, 2027-03-19, 2027-03-22, 2027-03-23, 2027-03-24, 2027-03-25, 2027-03-26, 2027-03-29, 2027-03-30, 2027-03-31, 2027-04-01, 2027-04-02, 2027-04-05, 2027-04-06, 2027-04-07, 2027-04-08, 2027-04-09, 2027-04-12, 2027-04-13, 2027-04-14, 2027-04-15, 2027-04-16, 2027-04-19, 2027-04-20, 2027-04-21, 2027-04-22, 2027-04-23, 2027-04-26, 2027-04-27, 2027-04-28, 2027-04-29, 2027-04-30, 2027-05-03, 2027-05-04, 2027-05-05, 2027-05-06, 2027-05-07, 2027-05-10, 2027-05-11, 2027-05-12, 2027-05-13, 2027-05-14, 2027-05-17, 2027-05-18, 2027-05-19, 2027-05-20, 2027-05-21, 2027-05-24, 2027-05-25, 2027-05-26, 2027-05-27, 2027-05-28, 2027-05-31, 2027-06-01, 2027-06-02, 2027-06-03, 2027-06-04, 2027-06-07, 2027-06-08, 2027-06-09, 2027-06-10, 2027-06-11, 2027-06-14, 2027-06-15, 2027-06-16, 2027-06-17, 2027-06-18, 2027-06-21, 2027-06-22, 2027-06-23, 2027-06-24, 2027-06-25, 2027-06-28, 2027-06-29, 2027-06-30, 2027-07-01, 2027-07-02, 2027-07-05, 2027-07-06, 2027-07-07, 2027-07-08, 2027-07-09, 2027-07-12, 2027-07-13, 2027-07-14, 2027-07-15, 2027-07-16, 2027-07-19, 2027-07-20, 2027-07-21, 2027-07-22, 2027-07-23, 2027-07-26, 2027-07-27, 2027-07-28, 2027-07-29, 2027-07-30, 2027-08-02, 2027-08-03, 2027-08-04, 2027-08-05, 2027-08-06, 2027-08-09, 2027-08-10, 2027-08-11, 2027-08-12, 2027-08-13, 2027-08-16, 2027-08-17, 2027-08-18, 2027-08-19, 2027-08-20, 2027-08-23, 2027-08-24, 2027-08-25, 2027-08-26, 2027-08-27, 2027-08-30, 2027-08-31, 2027-09-01, 2027-09-02, 2027-09-03, 2027-09-06, 2027-09-07, 2027-09-08, 2027-09-09, 2027-09-10, 2027-09-13, 2027-09-14, 2027-09-15, 2027-09-16, 2027-09-17, 2027-09-20, 2027-09-21, 2027-09-22, 2027-09-23, 2027-09-24, 2027-09-27, 2027-09-28, 2027-09-29, 2027-09-30, 2027-10-01, 2027-10-04, 2027-10-05, 2027-10-06, 2027-10-07, 2027-10-08, 2027-10-11, 2027-10-12, 2027-10-13, 2027-10-14, 2027-10-15, 2027-10-18, 2027-10-19, 2027-10-20, 2027-10-21, 2027-10-22, 2027-10-25, 2027-10-26, 2027-10-27, 2027-10-28, 2027-10-29
+**Schedule:** start 2026-10-31 · end 2027-07-17 · 260 days, 80 working days (7 days a week) · effort S=1 M=1.5 L=2 XL=4.5 working days · off 2026-11-02, 2026-11-03, 2026-11-04, 2026-11-05, 2026-11-06, 2026-11-09, 2026-11-10, 2026-11-11, 2026-11-12, 2026-11-13, 2026-11-16, 2026-11-17, 2026-11-18, 2026-11-19, 2026-11-20, 2026-11-23, 2026-11-24, 2026-11-25, 2026-11-26, 2026-11-27, 2026-11-30, 2026-12-01, 2026-12-02, 2026-12-03, 2026-12-04, 2026-12-07, 2026-12-08, 2026-12-09, 2026-12-10, 2026-12-11, 2026-12-14, 2026-12-15, 2026-12-16, 2026-12-17, 2026-12-18, 2026-12-21, 2026-12-22, 2026-12-23, 2026-12-24, 2026-12-25, 2026-12-28, 2026-12-29, 2026-12-30, 2026-12-31, 2027-01-01, 2027-01-04, 2027-01-05, 2027-01-06, 2027-01-07, 2027-01-08, 2027-01-11, 2027-01-12, 2027-01-13, 2027-01-14, 2027-01-15, 2027-01-18, 2027-01-19, 2027-01-20, 2027-01-21, 2027-01-22, 2027-01-25, 2027-01-26, 2027-01-27, 2027-01-28, 2027-01-29, 2027-02-01, 2027-02-02, 2027-02-03, 2027-02-04, 2027-02-05, 2027-02-08, 2027-02-09, 2027-02-10, 2027-02-11, 2027-02-12, 2027-02-15, 2027-02-16, 2027-02-17, 2027-02-18, 2027-02-19, 2027-02-22, 2027-02-23, 2027-02-24, 2027-02-25, 2027-02-26, 2027-03-01, 2027-03-02, 2027-03-03, 2027-03-04, 2027-03-05, 2027-03-08, 2027-03-09, 2027-03-10, 2027-03-11, 2027-03-12, 2027-03-15, 2027-03-16, 2027-03-17, 2027-03-18, 2027-03-19, 2027-03-22, 2027-03-23, 2027-03-24, 2027-03-25, 2027-03-26, 2027-03-29, 2027-03-30, 2027-03-31, 2027-04-01, 2027-04-02, 2027-04-05, 2027-04-06, 2027-04-07, 2027-04-08, 2027-04-09, 2027-04-12, 2027-04-13, 2027-04-14, 2027-04-15, 2027-04-16, 2027-04-19, 2027-04-20, 2027-04-21, 2027-04-22, 2027-04-23, 2027-04-26, 2027-04-27, 2027-04-28, 2027-04-29, 2027-04-30, 2027-05-03, 2027-05-04, 2027-05-05, 2027-05-06, 2027-05-07, 2027-05-10, 2027-05-11, 2027-05-12, 2027-05-13, 2027-05-14, 2027-05-17, 2027-05-18, 2027-05-19, 2027-05-20, 2027-05-21, 2027-05-24, 2027-05-25, 2027-05-26, 2027-05-27, 2027-05-28, 2027-05-31, 2027-06-01, 2027-06-02, 2027-06-03, 2027-06-04, 2027-06-07, 2027-06-08, 2027-06-09, 2027-06-10, 2027-06-11, 2027-06-14, 2027-06-15, 2027-06-16, 2027-06-17, 2027-06-18, 2027-06-21, 2027-06-22, 2027-06-23, 2027-06-24, 2027-06-25, 2027-06-28, 2027-06-29, 2027-06-30, 2027-07-01, 2027-07-02, 2027-07-05, 2027-07-06, 2027-07-07, 2027-07-08, 2027-07-09, 2027-07-12, 2027-07-13, 2027-07-14, 2027-07-15, 2027-07-16, 2027-07-19, 2027-07-20, 2027-07-21, 2027-07-22, 2027-07-23, 2027-07-26, 2027-07-27, 2027-07-28, 2027-07-29, 2027-07-30, 2027-08-02, 2027-08-03, 2027-08-04, 2027-08-05, 2027-08-06, 2027-08-09, 2027-08-10, 2027-08-11, 2027-08-12, 2027-08-13, 2027-08-16, 2027-08-17, 2027-08-18, 2027-08-19, 2027-08-20, 2027-08-23, 2027-08-24, 2027-08-25, 2027-08-26, 2027-08-27, 2027-08-30, 2027-08-31, 2027-09-01, 2027-09-02, 2027-09-03, 2027-09-06, 2027-09-07, 2027-09-08, 2027-09-09, 2027-09-10, 2027-09-13, 2027-09-14, 2027-09-15, 2027-09-16, 2027-09-17, 2027-09-20, 2027-09-21, 2027-09-22, 2027-09-23, 2027-09-24, 2027-09-27, 2027-09-28, 2027-09-29, 2027-09-30, 2027-10-01, 2027-10-04, 2027-10-05, 2027-10-06, 2027-10-07, 2027-10-08, 2027-10-11, 2027-10-12, 2027-10-13, 2027-10-14, 2027-10-15, 2027-10-18, 2027-10-19, 2027-10-20, 2027-10-21, 2027-10-22, 2027-10-25, 2027-10-26, 2027-10-27, 2027-10-28, 2027-10-29
 
 ## How we work
 
@@ -127,7 +127,7 @@ All 14 modules, the Expert manual and custom games. Two people can play fully at
 | 27 | **Passwords.** Spinning letter columns and a submit button. | M | 2027-02-20 | Done 2026-11-02 |
 | 28 | **Needy modules.** The three modules that demand attention throughout the game. | XL | 2027-03-07 | In progress: built; the user will check the needy behaviour against the original |
 | 29 | **Expert manual.** A web manual for every module and appendix, wired to the menu button. | XL | 2027-03-21 | In progress: the user is reviewing the wording and choosing a page style |
-| 30 | **Custom games.** Choose timer, strikes and modules, and share a seed for the same bomb. | M | 2027-03-28 | Not started |
+| 30 | **Custom games.** Choose timer, strikes and modules, and share a seed for the same bomb. | M | 2027-03-28 | Next |
 
 Step 28 is built in parts:
 
@@ -171,15 +171,49 @@ Decisions for Phase D:
 - Morse Code flashes last 0.25 and 0.75 seconds, with gaps of 0.25 within a letter, 0.75 between letters and 3 before the word repeats (2026-11-02). The manual only says short, long and very long, so these are my choice, and the lamp is silent.
 - Who's on First and Memory change stage as the original does, seen by the user in a stream (2026-11-02): the display clears, the buttons sink one by one, the labels change while they are hidden, the buttons rise one by one, and the display comes back last. Buttons ignore clicks until then. The change takes 1.0 second on Memory and 1.4 on Who's on First; those timings are my choice.
 
+## Phase G: VR
+
+The Defuser can play in a VR headset, as well as on a computer, in the same game. An Expert in the same room can read the manual aloud, so VR doesn't need voice chat.
+
+| # | Feature | Effort | Due | Status |
+| --- | --- | --- | --- | --- |
+| 46 | **VR mode (WebXR).** An Enter VR button for the Defuser, who picks up the bomb, turns it and uses the modules with controllers and hands, built with Meta's Immersive Web SDK (IWSDK) and tested on the connected headset. The mouse game keeps working exactly as it does now. | 15d | 2027-05-22 | Not started |
+
+Step 46 is built in parts:
+
+| Part | What | Effort | Due | Status |
+| --- | --- | --- | --- | --- |
+| 46a | Move the game onto IWSDK and its Three.js build, with the desktop game unchanged. | M | 2027-04-04 | Not started |
+| 46b | Separate input from the mouse, so clicks and VR drive the same game actions. | M | 2027-04-10 | Not started |
+| 46c | Enter and leave VR, from the menu and during a game, with the button only on supported devices. | S | 2027-04-11 | Not started |
+| 46d | The VR room: desk height, where the player stands, and real-world scale. | M | 2027-04-18 | Not started |
+| 46e | Pick up, hold and rotate the bomb with controllers and with hands. | M | 2027-04-24 | Not started |
+| 46f | Use every module with controllers and hands, including held parts, wires, dials and small buttons. | L | 2027-05-01 | Not started |
+| 46g | A new menu matching the original game's, shared by the browser and VR, with difficulty, hints and game over. | L | 2027-05-08 | Not started |
+| 46h | Sound placed in the room, and vibration on presses and strikes. | S | 2027-05-09 | Not started |
+| 46i | Headset performance: frame rate, shadows and sharp text. | M | 2027-05-16 | Not started |
+| 46j | A full play test on the headset, with an Expert in the same room. | S | 2027-05-22 | Not started |
+
+Decisions for Phase G:
+
+- VR is part of the same game, not a separate mode (2026-11-02, the user's decision). One site, with an Enter VR button on the menu and during a game. Mouse clicks and VR must both work, so every step from here keeps the browser game working.
+- Use IWSDK, not plain Three.js VR (2026-11-02, the user's decision). It gives ready-made grabbing, pointers and panels, so the whole game moves onto its Three.js build and dev tools in part 46a.
+- The menu is redesigned to match the original game's, and the same menu serves the browser and VR (2026-11-02, the user's decision). HTML screens can't appear in VR, so this replaces them. It needs reference images of the original menu before part 46g.
+- Controllers and hands both come in the first version (2026-11-02, the user's decision), as IWSDK supports both.
+- The first VR version has the Expert in the same room, with voice chat from the headset later as step 47 (2026-11-02, agreed with the user).
+- VR comes before voice chat and release (2026-11-02, the user's decision, replacing the earlier plan to do it after release). Voice chat and release move back eight weekends, and the end date moves from 2027-06-06 to 2027-07-17.
+- Check VR directly on the headset connected to the laptop (2026-11-02, the user's way of working): the user's TCS CSR Family Day VR project already does this. It uses the `iwsdk-runtime`, `iwsdk-reference` and `metavr` MCP servers in `.mcp.json`, adb over USB with `adb reverse tcp:8081 tcp:8081`, and `runtime pair-headset`. Copy that setup from its `AGENTS.md` and `DESIGN.md`. The agent checks in the headset, then the user reviews.
+
 ## Phase E: voice chat and rooms
 
 Two players in different places connect with a room code and talk in the browser, even across countries.
 
 | # | Feature | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
-| 31 | **Rooms.** Create a room, join with a code, and see the connection status. | L | 2027-04-04 | Not started |
-| 32 | **Roles and lobby.** Pick Defuser or Expert; the game starts when both are ready, and each sees only their own view. | M | 2027-04-10 | Not started |
-| 33 | **Voice chat.** Microphone audio with mute, a volume indicator, and a relay server for networks that block direct connections. | L | 2027-04-17 | Not started |
+| 31 | **Rooms.** Create a room, join with a code, and see the connection status. | L | 2027-05-30 | Not started |
+| 32 | **Roles and lobby.** Pick Defuser or Expert; the game starts when both are ready, and each sees only their own view. | M | 2027-06-05 | Not started |
+| 33 | **Voice chat.** Microphone audio with mute, a volume indicator, and a relay server for networks that block direct connections. | L | 2027-06-12 | Not started |
+| 47 | **Voice chat in VR.** The headset's microphone and speakers work in rooms, so a VR Defuser and a remote Expert can talk. | S | 2027-06-13 | Not started |
 
 Decisions for Phase E:
 
@@ -191,25 +225,12 @@ The game feels finished, works across browsers, and is ready to deploy.
 
 | # | Feature | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
-| 34 | **Visual polish.** Better materials, a richer room, and sparks, smoke and confetti. | L | 2027-04-24 | Not started |
-| 35 | **Animation and tension.** Screen transitions, solve animations, a pulsing low timer, and the lights-out event. | M | 2027-05-01 | Not started |
-| 36 | **Full sound design.** Ambient tension, music, and unique sounds for each module. | L | 2027-05-08 | Not started |
-| 37 | **Settings and How to Play.** Audio and graphics settings, a colour-blind mode, and a tutorial, wired to the menu buttons. | M | 2027-05-09 | Not started |
-| 38 | **Statistics.** Games played, win rate and best times, saved in the browser. | S | 2027-05-15 | Not started |
-| 39 | **Release.** Tested on Chrome, Firefox, Edge and Safari, performance checked, and a production build ready to deploy. | L | 2027-05-22 | Not started |
-
-## Phase G: VR
-
-The Defuser can play in a VR headset, as well as on a computer.
-
-| # | Feature | Effort | Due | Status |
-| --- | --- | --- | --- | --- |
-| 46 | **VR mode (WebXR).** An Enter VR option for the Defuser, who picks up the bomb, turns it and uses the modules with controllers or hands, built with Meta's Immersive Web SDK (IWSDK) and tested on a connected headset. | XL | 2027-06-06 | Not started |
-
-Decisions for Phase G:
-
-- Check VR directly on the headset connected to the laptop (2026-11-02, the user's way of working): the user's TCS CSR Family Day VR project already does this. It uses the `iwsdk-runtime`, `iwsdk-reference` and `metavr` MCP servers in `.mcp.json`, adb over USB with `adb reverse tcp:8081 tcp:8081`, and `runtime pair-headset`. Copy that setup from its `AGENTS.md` and `DESIGN.md`. The agent checks in the headset, then the user reviews.
-- VR comes after the main release (2026-11-02), because every module and control has to exist first, and adding it to the tight 60-day plan would push the release back. The user can move it earlier. The desktop game stays as it is.
+| 34 | **Visual polish.** Better materials, a richer room, and sparks, smoke and confetti. | L | 2027-06-19 | Not started |
+| 35 | **Animation and tension.** Screen transitions, solve animations, a pulsing low timer, and the lights-out event. | M | 2027-06-26 | Not started |
+| 36 | **Full sound design.** Ambient tension, music, and unique sounds for each module. | L | 2027-07-03 | Not started |
+| 37 | **Settings and How to Play.** Audio and graphics settings, a colour-blind mode, and a tutorial, wired to the menu buttons. | M | 2027-07-04 | Not started |
+| 38 | **Statistics.** Games played, win rate and best times, saved in the browser. | S | 2027-07-10 | Not started |
+| 39 | **Release.** Tested on Chrome, Firefox, Edge and Safari, performance checked, and a production build ready to deploy. | L | 2027-07-17 | Not started |
 
 ## Later
 
@@ -224,5 +245,5 @@ Decisions for Phase G:
 
 - **The 60-day plan is tight.** Sizes were halved with the scope unchanged, while Blender modelling added work: a large module now gets one weekend, model included. Wires (step 16) is the first real test, so review the later sizes after it. If it runs over, the polish steps (34 to 36) are the first candidates to shrink.
 - **Modelling needs Blender open.** Blender MCP drives a running copy of Blender, so model work happens in sessions where it is open on this computer. Blender, the MCP server and its add-on still need setting up in step 40.
-- **IWSDK is a framework, not a plug-in.** It is built on Three.js but has its own entity system and project tooling, so step 46 must first check how much of `main.js`, `BombController` and the mouse input it replaces, or whether plain Three.js WebXR is the better fit. IWSDK also expects its own Three.js build (`super-three`) and its CLI-managed dev server, so both need trying against this project.
+- **IWSDK is a framework, not a plug-in.** It is built on Three.js but has its own entity system and project tooling. It expects its own Three.js build (`super-three`, 0.181 in the TCS project, while this game uses 0.186), Vite 7 (this game uses 8) and its CLI-managed dev server. Part 46a has to move the game across without changing the desktop game, so it may turn out larger than its size, and every module's look needs rechecking afterwards.
 - **Relay server for voice chat.** Roughly 15 to 20% of connections need one, and the free options need checking at step 33. Costs and limits are unknown for now.
