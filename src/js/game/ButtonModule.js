@@ -8,6 +8,7 @@
 import { ModuleBase } from './ModuleBase.js';
 import { ModuleManager } from './ModuleManager.js';
 import { ButtonRules, createButton, HOLD_SECONDS } from './rules/ButtonRules.js';
+import { playSound } from '../audio/Sounds.js';
 import { createTextLabel } from '../three/TextLabel.js';
 import { MODULE_NAMES, MODULE_TYPES } from '../utils/constants.js';
 import { displayTime } from '../utils/helpers.js';
@@ -74,6 +75,7 @@ class ButtonModule extends ModuleBase {
 
   onPartPress() {
     this.rules.press();
+    playSound('press');
     this._heldSeconds = 0;
     this._button.position.z = this._restZ - PRESS_DEPTH;
     return true;
@@ -81,6 +83,7 @@ class ButtonModule extends ModuleBase {
 
   onPartRelease() {
     const heldSeconds = this._heldSeconds;
+    playSound('release');
     this._heldSeconds = null;
     this._button.position.z = this._restZ;
     this._setStrip(null);

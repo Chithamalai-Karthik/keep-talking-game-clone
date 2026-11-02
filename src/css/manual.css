@@ -1,0 +1,564 @@
+/* ============================================================
+   manual.css — The Expert manual
+   Paper-white and black, so it reads like a printed handbook and
+   prints cleanly. Drawings are plain line art.
+   ============================================================ */
+
+:root {
+  --ink: #111;
+  --soft-ink: #555;
+  --rule: #bbb;
+  --paper: #fff;
+  --page-back: #eee;
+  --serif: Georgia, 'Times New Roman', serif;
+  --sans: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page-back);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+/* ---------- Page heading ---------- */
+.manual-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 26px 0 0;
+  font-family: var(--sans);
+}
+
+.manual-head h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+}
+
+.manual-role {
+  margin: 4px 0 0;
+  color: var(--soft-ink);
+}
+
+#manual-print {
+  padding: 8px 18px;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#manual-print:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- Pages ---------- */
+main {
+  padding: 26px;
+  min-width: 0;
+}
+
+section {
+  max-width: 820px;
+  margin: 0 auto 26px;
+  padding: 30px 40px 34px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  scroll-margin-top: 16px;
+  overflow-wrap: break-word;
+}
+
+.group-title {
+  max-width: 820px;
+  margin: 34px auto 10px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--soft-ink);
+}
+
+h2 {
+  margin: 0 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 3px solid var(--ink);
+  font-family: var(--sans);
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+h4 {
+  margin: 20px 0 6px;
+  font-family: var(--sans);
+  font-size: 17px;
+}
+
+p { margin: 0 0 10px; }
+
+ul, ol {
+  margin: 0 0 12px;
+  padding-left: 26px;
+}
+
+li { margin-bottom: 4px; }
+
+.module-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.module-head .drawing {
+  flex: 0 0 110px;
+  width: 110px;
+}
+
+.intro {
+  margin: 0;
+  color: var(--soft-ink);
+  font-style: italic;
+}
+
+/* ---------- Drawings ---------- */
+.drawing {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  fill: none;
+  stroke: #000;
+  stroke-width: 1.5;
+}
+
+section > .drawing { margin: 10px auto; }
+
+/* ---------- Tables ---------- */
+table {
+  width: 100%;
+  margin: 8px 0 14px;
+  border-collapse: collapse;
+  font-family: var(--sans);
+  font-size: 15px;
+}
+
+th, td {
+  padding: 6px 9px;
+  border: 1px solid var(--ink);
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+td .drawing { max-height: 90px; width: auto; }
+
+.side-by-side {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.side-by-side > * {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+/* ---------- Keypad columns ---------- */
+.keypad-columns {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.keypad-column {
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--ink);
+}
+
+.keypad-column img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------- Who's on First ---------- */
+.display-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.display-cell {
+  border: 1px solid var(--ink);
+  text-align: center;
+}
+
+.display-word {
+  padding: 2px 3px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.display-cell .drawing {
+  width: 62px;
+  margin: 5px auto;
+}
+
+/* ---------- Morse ---------- */
+.morse-chart {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px 18px;
+  margin: 10px 0 16px;
+  font-family: var(--sans);
+}
+
+.morse-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.morse-cell strong { width: 16px; }
+
+.morse-cell span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot, .dash {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  color: var(--ink);
+}
+
+/* Borders, because browsers leave backgrounds out when printing */
+.dot { border: 4px solid; border-radius: 50%; }
+.dash { width: 24px; border-top: 8px solid; }
+
+/* ---------- Mazes and word grids ---------- */
+.maze-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.word-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 10px;
+  font-family: var(--sans);
+  text-align: center;
+  border-top: 1px solid var(--ink);
+  border-left: 1px solid var(--ink);
+}
+
+.word-grid span {
+  padding: 8px 4px;
+  border-right: 1px solid var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.indicators { font-weight: 700; }
+
+/* ---------- Knob ---------- */
+.lights { table-layout: fixed; }
+
+.lights td {
+  height: 30px;
+  padding: 2px;
+  text-align: center;
+  font-weight: 700;
+}
+
+/* ---------- Style toggle ---------- */
+.manual-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.style-toggle {
+  display: inline-flex;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.style-toggle button {
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.style-toggle button[aria-pressed="true"] {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.margin-note { display: none; }
+
+/* ---------- Style: field manual ---------- */
+:root[data-style="field"] {
+  --ink: #231d14;
+  --soft-ink: #5c5040;
+  --rule: #8f7f60;
+  --paper: #e6dbc2;
+  --page-back: #2c2822;
+  --serif: 'Courier New', Courier, monospace;
+  --sans: 'Courier New', Courier, monospace;
+}
+
+[data-style="field"] .manual-head,
+[data-style="field"] .group-title { color: #e9dfc8; }
+
+[data-style="field"] .manual-head .manual-role { color: #b9ab8d; }
+
+[data-style="field"] section {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--paper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"), linear-gradient(135deg, #ece2ca, #dccdaa 60%, #d3c29c);
+  border: 0;
+  box-shadow: 0 5px 16px #0009;
+}
+
+[data-style="field"] section::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 44%;
+  width: 104px;
+  height: 26px;
+  background: #d9c98fb3;
+  transform: rotate(-3deg);
+}
+
+[data-style="field"] section:nth-of-type(3n)::after {
+  content: '';
+  position: absolute;
+  right: 26px;
+  bottom: 26px;
+  width: 130px;
+  height: 130px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Ccircle cx='60' cy='60' r='50' fill='none' stroke='%237a4d1e' stroke-width='5' opacity='.2' stroke-dasharray='120 8 60 5 90 10'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+[data-style="field"] h2 {
+  position: relative;
+  border-bottom: 2px dashed var(--ink);
+  letter-spacing: 0.02em;
+}
+
+[data-style="field"] h2::after {
+  content: 'RESTRICTED';
+  position: absolute;
+  top: -2px;
+  right: 0;
+  padding: 1px 10px;
+  border: 3px solid #9b2418;
+  color: #9b2418;
+  font-family: Impact, 'Arial Black', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+  transform: rotate(6deg);
+}
+
+[data-style="field"] h4 { text-decoration: underline; }
+
+[data-style="field"] .keypad-column img { mix-blend-mode: multiply; }
+
+/* ---------- Style: classified dossier ---------- */
+:root[data-style="dossier"] {
+  --ink: #20190f;
+  --soft-ink: #5a4f3c;
+  --rule: #9b8a66;
+  --paper: #f4efe3;
+  --page-back: #c2a26a;
+  --serif: Georgia, 'Times New Roman', serif;
+  --sans: 'Courier New', Courier, monospace;
+}
+
+[data-style="dossier"] body { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .3 0 0 0 0 .25 0 0 0 0 .15 0 0 0 .14 0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E"); }
+
+[data-style="dossier"] section {
+  position: relative;
+  border: 0;
+  box-shadow: 2px 4px 9px #0006;
+}
+
+[data-style="dossier"] section::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  right: 36px;
+  width: 24px;
+  height: 62px;
+  border: 3px solid #7d7f85;
+  border-radius: 12px;
+}
+
+[data-style="dossier"] h2 { border-bottom-width: 1px; }
+
+[data-style="dossier"] .group-title {
+  width: fit-content;
+  margin-left: max(26px, calc(50% - 386px));
+  margin-bottom: 0;
+  padding: 5px 18px;
+  border-radius: 7px 7px 0 0;
+  background: #a8854e;
+  color: var(--ink);
+}
+
+[data-style="dossier"] .margin-note {
+  display: block;
+  margin: -4px 0 12px;
+  color: #17408a;
+  font-family: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+  font-size: 16px;
+  transform: rotate(-1deg);
+  transform-origin: left;
+}
+
+/* ---------- Small screens ---------- */
+/* Screens only: a printed A4 page is this narrow too, and must not get this layout */
+@media screen and (max-width: 800px) {
+  body { font-size: 16px; }
+  .manual-head { flex-wrap: wrap; align-items: flex-start; }
+  .manual-tools { justify-content: flex-start; }
+  section { overflow-wrap: anywhere; }
+  table { font-size: 13px; }
+  th, td { padding: 4px 5px; }
+  h2 { font-size: 24px; }
+  [data-style="field"] h2::after { position: static; display: inline-block; margin-left: 8px; font-size: 12px; vertical-align: middle; }
+  .morse-chart { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .manual-head { padding: 16px 16px 0; }
+  main { padding: 12px; }
+  section { padding: 20px 16px; }
+  .keypad-columns { gap: 4px; }
+  .maze-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .word-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .module-head { align-items: flex-start; }
+}
+
+/* ---------- Print: planned A4 sheets, filled and numbered ---------- */
+@page {
+  size: A4;
+  margin: 13mm 14mm 15mm;
+
+  @bottom-center {
+    content: "Page " counter(page) " of " counter(pages);
+    font-family: Georgia, serif;
+    font-size: 9pt;
+  }
+}
+
+@media print {
+  body { background: #fff; font-size: 10.5pt; line-height: 1.4; }
+  #manual-print, .style-toggle, .group-title { display: none; }
+
+  /* Paper, stains and tape stay on screen: a print is clean black ink */
+  :root[data-style] { --paper: #fff; --ink: #000; --soft-ink: #333; }
+  html body { background: #fff; }
+  html section { background: none !important; box-shadow: none !important; overflow: visible !important; }
+  html section::before, html section::after { display: none !important; }
+  html .manual-head, html .manual-head .manual-role { color: #000; }
+  [data-style="field"] body { font-size: 9.6pt; }
+  [data-style="field"] h2::after { top: 0; font-size: 12pt; padding: 0 8px; border-width: 2px; transform: none; }
+  [data-style="dossier"] .margin-note { font-size: 11pt; margin: -2px 0 5px; }
+  .manual-head { max-width: none; padding: 0 0 3mm; }
+  .manual-head { padding-bottom: 8mm; border-bottom: 3px solid #000; margin-bottom: 8mm; }
+  .manual-head h1 { font-size: 34pt; }
+  .manual-role { display: block; font-size: 13pt; }
+  main { padding: 0; }
+
+  section {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    break-after: page;
+  }
+
+  section.flows-on { break-after: auto; margin-bottom: 7mm; }
+  section:last-child { break-after: auto; }
+  h2 { font-size: 17pt; margin-bottom: 7px; }
+  h4 { margin: 9px 0 3px; font-size: 11pt; break-after: avoid; }
+  .new-sheet { break-before: page; }
+  p { margin-bottom: 5px; }
+  ul, ol { margin-bottom: 6px; }
+  li { margin-bottom: 2px; }
+  .module-head { margin-bottom: 7px; }
+  .module-head .drawing { flex-basis: 75px; width: 75px; }
+
+  table { font-size: 9.5pt; margin: 4px 0 8px; }
+  th, td { padding: 3px 7px; }
+  th { background: #fff; color: #000; border-bottom-width: 2px; }
+  table, .maze-grid, .keypad-columns, .display-cell, .morse-chart { break-inside: avoid; }
+  .display-word { background: #fff; color: #000; border-bottom: 1px solid #000; }
+
+  /* Sized so each of these fills its sheet */
+  #welcome, #defusing-bombs { font-size: 12pt; line-height: 1.5; }
+  #welcome h2, #defusing-bombs h2 { font-size: 20pt; }
+  #defusing-bombs h4 { font-size: 13pt; margin-top: 14px; }
+  #defusing-bombs { break-after: page; }
+  .keypad-columns { gap: 3mm; }
+  .display-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3mm; }
+  .display-cell .drawing { width: 17mm; margin: 1mm auto; }
+  #whos-on-first table, .display-word { font-family: Arial, Helvetica, sans-serif; }
+  #whos-on-first table { font-size: 8.8pt; line-height: 1.25; }
+  #whos-on-first td { padding: 3px 6px; }
+  .display-word { font-size: 8pt; }
+  #memory ul { columns: 1; }
+  #morse-code .morse-chart { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px 10px; }
+  #morse-code td { padding: 1.5px 7px; }
+  #complicated-wires section > .drawing, #complicated-wires > .drawing { width: 74%; margin: 2mm auto; }
+  .maze-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5mm; }
+  .word-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .word-grid span { padding: 4px; }
+  section.flows-on { margin-bottom: 5mm; }
+  .display-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .lights td { height: 40px; font-size: 12pt; }
+  #the-button, #simon-says { font-size: 12pt; line-height: 1.5; }
+  #the-button h2, #simon-says h2 { font-size: 20pt; }
+  #the-button li, #simon-says li { margin-bottom: 7px; }
+  #the-button h4, #simon-says h4 { font-size: 14pt; margin-top: 16px; }
+  #simon-says table { font-size: 12pt; }
+  #simon-says th, #simon-says td { padding: 9px 9px; }
+  td .drawing { max-height: 60px; }
+}

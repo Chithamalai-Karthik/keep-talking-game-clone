@@ -104,6 +104,28 @@ export class BombModel {
       this.group.add(slot.mesh);
       this.moduleSlots.push(slot);
     });
+
+    this.moduleSlots.forEach(slot => this._loadCover(slot));
+  }
+
+  /**
+   * Give a slot the orange plate that covers it while it has no module
+   */
+  _loadCover(slot) {
+    loadModel('empty_slot')
+      .then((cover) => {
+        cover.traverse((child) => {
+          if (child.isMesh) child.castShadow = true;
+        });
+        slot.cover = cover;
+        slot.mesh.add(cover);
+        this._refreshCover(slot);
+      })
+      .catch((err) => console.error('[KTANE] Failed to load slot cover:', err));
+  }
+
+  _refreshCover(slot) {
+    if (slot.cover) slot.cover.visible = !slot.isActive && !slot.isTimerSlot;
   }
 
   /**
@@ -114,6 +136,7 @@ export class BombModel {
       this._timerSlot.isTimerSlot = false;
       this._timerSlot.mesh.userData.interactive = true;
       this._timerSlot.mesh.userData.type = 'moduleSlot';
+      this._refreshCover(this._timerSlot);
     }
 
     const slot = this.getSlotById(slotId);
@@ -122,6 +145,7 @@ export class BombModel {
     slot.mesh.userData.type = 'timerSlot';
     slot.mesh.add(this.timerGroup);
     this._timerSlot = slot;
+    this._refreshCover(slot);
   }
 
   _createSlotGrid(cols, rows, facePrefix) {
@@ -539,6 +563,7 @@ export class BombModel {
     const slot = this.getSlotById(slotId);
     if (!slot) return;
     slot.isActive = active;
+    this._refreshCover(slot);
   }
 
   /**

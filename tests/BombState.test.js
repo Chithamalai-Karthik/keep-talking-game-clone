@@ -91,7 +91,7 @@ describe('modules and the timer slot', () => {
       const slots = bomb.modules.map(module => module.slotId);
       expect(slots).toHaveLength(config.modules);
       expect(new Set([...slots, bomb.timerSlotId]).size).toBe(config.modules + 1);
-      bomb.modules.forEach(module => expect(ACTIVE_MODULES).toContain(module.type));
+      bomb.regularModules.forEach(module => expect(ACTIVE_MODULES).toContain(module.type));
     }
   });
 

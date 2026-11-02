@@ -9,6 +9,7 @@ import {
   ACTIVE_MODULES,
   BATTERY_CELLS,
   INDICATOR_LABELS,
+  NEEDY_MODULES,
   PORT_TYPES,
   WIDGET_MOUNT_COUNT,
 } from '../utils/constants.js';
@@ -33,7 +34,7 @@ export class BombState {
     this.timeRemaining = config.time;
 
     // Module assignment
-    this.modules = this._assignModules(config.modules);
+    this.modules = this._assignModules(config.modules, config.needy ?? 0);
 
     // Derived properties (used by module rules)
     this.serialLastDigitOdd = this._isSerialLastDigitOdd();
@@ -120,9 +121,10 @@ export class BombState {
   /* ----------------------------------------------------------
      MODULE ASSIGNMENT — Pick N modules, assign to slot IDs
   ---------------------------------------------------------- */
-  _assignModules(moduleCount) {
+  _assignModules(moduleCount, needyCount) {
     const modules = [];
-    const availableTypes = ACTIVE_MODULES;
+    const regularCount = moduleCount - needyCount;
+    const randomType = types => types[Math.floor(Math.random() * types.length)];
 
     // 12 slots across both faces: the timer takes a random one, modules fill the rest
     const allSlotIds = [
@@ -136,11 +138,12 @@ export class BombState {
 
     for (let i = 0; i < moduleCount && i < slotIds.length; i++) {
       // Pick a random module type (allow repeats for larger counts)
-      const type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+      const needy = i >= regularCount;
 
       modules.push({
         slotId: slotIds[i],
-        type: type,
+        type: randomType(needy ? NEEDY_MODULES : ACTIVE_MODULES),
+        needy,
         solved: false,
       });
     }
@@ -196,12 +199,19 @@ export class BombState {
   }
 
   /**
-   * Mark a module as solved. Returns true if all modules are solved.
+   * The modules that must be solved: needy modules never can be
+   */
+  get regularModules() {
+    return this.modules.filter(m => !m.needy);
+  }
+
+  /**
+   * Mark a module as solved. Returns true if all regular modules are solved.
    */
   solveModule(slotId) {
     const mod = this.modules.find(m => m.slotId === slotId);
     if (mod) mod.solved = true;
-    return this.modules.every(m => m.solved);
+    return this.regularModules.every(m => m.solved);
   }
 
   /**

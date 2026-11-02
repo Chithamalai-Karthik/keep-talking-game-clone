@@ -3,12 +3,12 @@
    Module rules, difficulty presets, word lists, symbol sets, etc.
    ============================================================ */
 
-// Difficulty presets
+// Difficulty presets. Needy modules count towards the modules, so every bomb still fits.
 export const DIFFICULTY = {
-  easy:   { modules: 3,  time: 300, maxStrikes: 3, label: 'Easy' },
-  medium: { modules: 6,  time: 240, maxStrikes: 3, label: 'Medium' },
-  hard:   { modules: 9,  time: 180, maxStrikes: 2, label: 'Hard' },
-  expert: { modules: 11, time: 180, maxStrikes: 1, label: 'Expert' },
+  easy:   { modules: 3,  needy: 0, time: 300, maxStrikes: 3, label: 'Easy' },
+  medium: { modules: 6,  needy: 1, time: 240, maxStrikes: 3, label: 'Medium' },
+  hard:   { modules: 9,  needy: 1, time: 180, maxStrikes: 2, label: 'Hard' },
+  expert: { modules: 11, needy: 2, time: 180, maxStrikes: 1, label: 'Expert' },
 };
 
 // Module types
@@ -38,7 +38,17 @@ export const ACTIVE_MODULES = [
   MODULE_TYPES.BUTTON,
   MODULE_TYPES.KEYPADS,
   MODULE_TYPES.SIMON_SAYS,
+  MODULE_TYPES.WHOS_ON_FIRST,
+  MODULE_TYPES.MEMORY,
+  MODULE_TYPES.MORSE_CODE,
+  MODULE_TYPES.COMPLICATED_WIRES,
+  MODULE_TYPES.WIRE_SEQUENCES,
+  MODULE_TYPES.MAZES,
+  MODULE_TYPES.PASSWORDS,
 ];
+
+// Needy module types a bomb can currently contain
+export const NEEDY_MODULES = Object.values(NEEDY_MODULE_TYPES);
 
 // Module display names
 export const MODULE_NAMES = {
@@ -60,6 +70,14 @@ export const MODULE_NAMES = {
 
 // Wire colors
 export const WIRE_COLORS = ['red', 'blue', 'yellow', 'white', 'black'];
+
+export const WIRE_HEX = {
+  red: 0xd8191a,
+  blue: 0x1f4fd0,
+  yellow: 0xf2c414,
+  white: 0xf0efe8,
+  black: 0x16161a,
+};
 
 // Button colors and labels
 export const BUTTON_COLORS = ['red', 'blue', 'white', 'yellow'];

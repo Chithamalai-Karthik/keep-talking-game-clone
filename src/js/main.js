@@ -12,12 +12,24 @@ import { Raycaster } from './three/Raycaster.js';
 import { MenuUI } from './ui/MenuUI.js';
 import { DIFFICULTY, strikeSpeed } from './utils/constants.js';
 import { createMenuParticles, displayTime, formatTime } from './utils/helpers.js';
+import { playSound, unlockAudio } from './audio/Sounds.js';
 import { BombState } from './game/BombState.js';
 import { ModuleManager } from './game/ModuleManager.js';
 import './game/PlaceholderModule.js'; // Register placeholder modules
 import './game/WiresModule.js';
 import './game/ButtonModule.js';
 import './game/KeypadModule.js';
+import './game/SimonModule.js';
+import './game/WhosOnFirstModule.js';
+import './game/MemoryModule.js';
+import './game/MorseModule.js';
+import './game/ComplicatedWiresModule.js';
+import './game/WireSequencesModule.js';
+import './game/MazeModule.js';
+import './game/PasswordModule.js';
+import './game/VentingModule.js';
+import './game/CapacitorModule.js';
+import './game/KnobModule.js';
 
 class App {
   constructor() {
@@ -49,9 +61,12 @@ class App {
   }
 
   _init() {
+    window.addEventListener('pointerdown', unlockAudio);
+
     // --- MENU SETUP FIRST (so buttons always work) ---
     this.menuUI = new MenuUI();
     this.menuUI.onDifficultySelected((difficulty) => this._startGame(difficulty));
+    this.menuUI.onManual(() => window.open(`${import.meta.env.BASE_URL}manual.html`, '_blank'));
 
     // Create menu particles
     const particleContainer = document.getElementById('menu-particles');
@@ -113,6 +128,11 @@ class App {
             // Trigger a strike
             this._onStrike();
             console.log('[DEBUG] Triggered strike');
+          }
+          if (e.key === 'n' || e.key === 'N') {
+            // Wake every needy module now
+            this.moduleManager.modules.forEach(module => module.activateNow?.());
+            console.log('[DEBUG] Woke needy modules');
           }
           if (e.key === 'g' || e.key === 'G') {
             // Trigger explosion
@@ -196,6 +216,7 @@ class App {
     // Only update the display when the visible second changes
     const currentSecond = Math.ceil(this.bombState.timeRemaining);
     if (currentSecond !== this._lastDisplayedSecond) {
+      if (this._lastDisplayedSecond !== -1) playSound('tick');
       this._lastDisplayedSecond = currentSecond;
 
       this.bombModel.updateTimerDisplay(displayTime(currentSecond), currentSecond < 60);
@@ -221,6 +242,8 @@ class App {
 
     if (exploded) {
       this._onGameOver(false);
+    } else {
+      playSound('strike');
     }
   }
 
@@ -238,6 +261,8 @@ class App {
    */
   _onGameOver(won) {
     this._gameOver = true;
+    this.moduleManager?.stop();
+    playSound(won ? 'defused' : 'explosion');
 
     const overlay = document.getElementById('game-over-overlay');
     const title = document.getElementById('game-over-title');
@@ -257,7 +282,8 @@ class App {
     // Stats
     const timeUsed = this.bombState.timeLimit - this.bombState.timeRemaining;
     const timeUsedText = formatTime(timeUsed);
-    const solvedCount = this.bombState.modules.filter(m => m.solved).length;
+    const { regularModules } = this.bombState;
+    const solvedCount = regularModules.filter(m => m.solved).length;
 
     statsContainer.innerHTML = `
       <div class="game-over-stat">
@@ -270,7 +296,7 @@ class App {
       </div>
       <div class="game-over-stat">
         <span class="game-over-stat-label">MODULES</span>
-        <span class="game-over-stat-value">${solvedCount}/${this.bombState.modules.length}</span>
+        <span class="game-over-stat-value">${solvedCount}/${regularModules.length}</span>
       </div>
     `;
 
@@ -353,6 +379,8 @@ class App {
 
     if (allSolved) {
       this._onGameOver(true);
+    } else {
+      playSound('solve');
     }
   }
 

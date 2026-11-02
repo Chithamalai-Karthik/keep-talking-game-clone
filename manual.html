@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" data-style="field">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bomb Defusal Manual</title>
+    <link rel="icon" href="data:," />
+    <meta name="description" content="The Expert's manual for the bomb defusal game." />
+    <link rel="stylesheet" href="/src/css/manual.css" />
+  </head>
+  <body>
+    <header class="manual-head">
+      <div>
+        <h1>Bomb Defusal Manual</h1>
+        <p class="manual-role">For the Expert</p>
+      </div>
+      <div class="manual-tools">
+        <div class="style-toggle" role="group" aria-label="Manual style">
+          <button type="button" data-style-choice="field">Field manual</button>
+          <button type="button" data-style-choice="dossier">Dossier</button>
+        </div>
+        <button id="manual-print" type="button">Print</button>
+      </div>
+    </header>
+    <main id="manual-pages"></main>
+    <script type="module" src="/src/js/manual/main.js"></script>
+  </body>
+</html>

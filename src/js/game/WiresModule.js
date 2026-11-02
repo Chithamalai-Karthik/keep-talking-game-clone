@@ -7,15 +7,8 @@
 import { ModuleBase } from './ModuleBase.js';
 import { ModuleManager } from './ModuleManager.js';
 import { createWires, WiresRules, WIRE_ROWS } from './rules/WiresRules.js';
-import { MODULE_NAMES, MODULE_TYPES } from '../utils/constants.js';
-
-const WIRE_HEX = {
-  red: 0xd8191a,
-  blue: 0x1f4fd0,
-  yellow: 0xf2c414,
-  white: 0xf0efe8,
-  black: 0x16161a,
-};
+import { playSound } from '../audio/Sounds.js';
+import { MODULE_NAMES, MODULE_TYPES, WIRE_HEX } from '../utils/constants.js';
 
 class WiresModule extends ModuleBase {
   setup() {
@@ -50,6 +43,7 @@ class WiresModule extends ModuleBase {
     const row = Number(partId.slice('wire_'.length));
     const result = this.rules.cut(row);
 
+    playSound('snip');
     this.removePart(partId);
     this._body.getObjectByName(`wire_cut_${row}`).visible = true;
 

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { ModuleBase } from './ModuleBase.js';
 import { ModuleManager } from './ModuleManager.js';
 import { createKeys, KeypadRules } from './rules/KeypadRules.js';
+import { playSound } from '../audio/Sounds.js';
 import { loadTexture } from '../three/ModelLoader.js';
 import { MODULE_NAMES, MODULE_TYPES } from '../utils/constants.js';
 
@@ -59,6 +60,7 @@ class KeypadModule extends ModuleBase {
   onPartClick(partId) {
     const index = Number(partId.slice('key_'.length));
     const result = this.rules.press(index);
+    if (result) playSound('press');
 
     if (result === 'strike') {
       this._showWrongKey(index);

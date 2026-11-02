@@ -99,6 +99,13 @@ export class ModuleManager {
   }
 
   /**
+   * The game is over: stop anything that acts by itself
+   */
+  stop() {
+    this.modules.forEach(module => module.stop());
+  }
+
+  /**
    * Highlight a module part under the mouse
    * @returns {boolean} — true if the part can be clicked
    */

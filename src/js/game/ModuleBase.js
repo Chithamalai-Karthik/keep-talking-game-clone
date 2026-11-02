@@ -46,6 +46,7 @@ export class ModuleBase {
     this.isSolved = false;
     this.moduleName = 'MODULE';
     this.modelName = null;
+    this.housingName = 'module_housing';
 
     this.root = new THREE.Group();
     this.parts = new Map();
@@ -69,7 +70,7 @@ export class ModuleBase {
     this.setup();
 
     const [housing, body] = await Promise.all([
-      loadModel('module_housing'),
+      loadModel(this.housingName),
       loadModel(this.modelName),
       this.loadAssets(),
     ]);
@@ -101,6 +102,11 @@ export class ModuleBase {
   onPartRelease(partId) {}
 
   update(delta, focusedSlotId) {}
+
+  /**
+   * The game is over: nothing may happen by itself any more
+   */
+  stop() {}
 
   /* ----------------------------------------------------------
      PARTS — Named Blender objects that can be clicked
@@ -164,6 +170,8 @@ export class ModuleBase {
   ---------------------------------------------------------- */
   _prepareStatusLight(housing) {
     this._statusLight = housing.getObjectByName('status_light');
+    if (!this._statusLight) return; // Needy modules have none
+
     this._statusLight.material = this._ownMaterial(this._statusLight.material);
     this._statusColor.copy(this._statusLight.material.color);
   }

@@ -1,6 +1,6 @@
 /* ============================================================
    TextLabel.js — Flat text for widgets and modules
-   The caller disposes the mesh's texture, material and geometry.
+   Text that changes or goes away is freed with disposeTextLabel.
    ============================================================ */
 
 import * as THREE from 'three';
@@ -33,4 +33,15 @@ export function createTextLabel(text, width, height, { color, background, font }
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: !background });
 
   return new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+}
+
+/**
+ * Take a label off its parent and free its texture, material and geometry
+ * @param {THREE.Mesh} text
+ */
+export function disposeTextLabel(text) {
+  text.removeFromParent();
+  text.material.map.dispose();
+  text.material.dispose();
+  text.geometry.dispose();
 }
