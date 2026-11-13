@@ -121,6 +121,5 @@ export function strikeSpeed(strikes) {
 // Screen IDs
 export const SCREENS = {
   MENU: 'menu-screen',
-  DIFFICULTY: 'difficulty-screen',
   GAME: 'game-screen',
 };

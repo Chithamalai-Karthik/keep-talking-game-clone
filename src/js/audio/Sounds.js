@@ -11,6 +11,7 @@ const NOISE_SECONDS = 2;
 
 let context = null;
 let master = null;
+let effectsVolume = 1;   // The player's choice in Options, 0 to 1
 const noiseBuffers = new WeakMap();
 
 /**
@@ -113,6 +114,17 @@ export const SOUNDS = {
     tone(ctx, out, { freq: 90, slideTo: 28, seconds: 1.6, volume: 0.8 });
   },
 
+  // A sheet of paper or a binder cover moving
+  paper: (ctx, out) => noise(ctx, out, { seconds: 0.18, filter: 'bandpass', freq: 2400, slideTo: 900, volume: 0.22 }),
+
+  // Half a second of the desk clock's alarm: rapid beeps jumping between two
+  // high pitches, so it sounds urgent rather than like a bedside clock
+  alarm: (ctx, out) => {
+    for (let i = 0; i < 8; i++) {
+      tone(ctx, out, { freq: i % 2 ? 2350 : 3100, seconds: 0.05, type: 'square', volume: 0.14, delay: i * 0.0625 });
+    }
+  },
+
   needy: (ctx, out) => {
     [0, 0.16].forEach(delay => tone(ctx, out, { freq: 980, seconds: 0.12, type: 'square', volume: 0.12, delay }));
   },
@@ -133,10 +145,18 @@ export function unlockAudio() {
   if (!context) {
     context = new AudioContextClass();
     master = context.createGain();
-    master.gain.value = MASTER_VOLUME;
+    master.gain.value = MASTER_VOLUME * effectsVolume;
     master.connect(context.destination);
   }
   if (context.state === 'suspended') context.resume();
+}
+
+/**
+ * Set the sound effect volume, 0 to 1
+ */
+export function setEffectsVolume(volume) {
+  effectsVolume = volume;
+  if (master) master.gain.value = MASTER_VOLUME * effectsVolume;
 }
 
 /**

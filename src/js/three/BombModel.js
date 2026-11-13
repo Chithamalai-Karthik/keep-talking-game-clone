@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { loadModel } from './ModelLoader.js';
 import { createTextLabel } from './TextLabel.js';
+import { drawDigit, drawStrike, timerCells } from './SevenSegment.js';
 
 // Module slot layout constants
 const SLOT_SIZE = 0.9;
@@ -37,15 +38,10 @@ export class BombModel {
     this._widgetRequest = 0;
 
     // Timer display
-    this.timerCanvas = null;
-    this.timerContext = null;
-    this.timerTexture = null;
-    this.timerMesh = null;
     this.timerGroup = new THREE.Group();
     this._timerSlot = null;
 
     // Strike indicators
-    this.strikeMeshes = [];
 
     // Hover outline
     this.outlineMesh = null;
@@ -53,7 +49,6 @@ export class BombModel {
     this._buildCasing();
     this._buildModuleSlots();
     this._buildTimerDisplay();
-    this._buildStrikeIndicators();
     this._buildWidgetMounts();
     this._buildOutline();
 
@@ -234,148 +229,83 @@ export class BombModel {
   }
 
   /* ----------------------------------------------------------
-     TIMER DISPLAY — Canvas texture on back face
+     TIMER — timer_module.glb, with its red digits and strike
+     marks drawn on its two screens
   ---------------------------------------------------------- */
   _buildTimerDisplay() {
-    // Create canvas for timer digits
-    this.timerCanvas = document.createElement('canvas');
-    this.timerCanvas.width = 256;
-    this.timerCanvas.height = 128;
-    this.timerContext = this.timerCanvas.getContext('2d');
+    this._timerScreen = makeScreen(512, 248);
+    this._strikeScreen = makeScreen(256, 102);
+    this._timerText = '5:00';
+    this._timerDanger = false;
+    this._strikes = [false, false];
 
-    this.timerTexture = new THREE.CanvasTexture(this.timerCanvas);
-    this.timerTexture.minFilter = THREE.LinearFilter;
+    loadModel('timer_module')
+      .then((model) => {
+        model.traverse((child) => {
+          if (child.isMesh) child.castShadow = true;
+        });
+        model.getObjectByName('tm_screen').material = this._timerScreen.material;
+        model.getObjectByName('tm_strike_screen').material = this._strikeScreen.material;
+        this.timerGroup.add(model);
+      })
+      .catch((err) => console.error('[KTANE] Failed to load the timer:', err));
 
-    // Timer display plane (fills the timer slot)
-    const timerGeo = new THREE.PlaneGeometry(SLOT_SIZE - 0.06, SLOT_SIZE * 0.5);
-    const timerMat = new THREE.MeshStandardMaterial({
-      map: this.timerTexture,
-      emissiveMap: this.timerTexture,
-      emissive: 0xffffff,
-      emissiveIntensity: 0.6,
-      roughness: 0.8,
-      metalness: 0.1,
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
-    this.timerMesh = new THREE.Mesh(timerGeo, timerMat);
-    this.timerMesh.position.set(0, 0.05, 0.003);
-
-    this.timerGroup.add(this.timerMesh);
-
-
-
-    // Initial draw
     this.updateTimerDisplay('5:00');
+    this._drawStrikes();
   }
 
   /**
-   * Update the timer display with a time string
+   * Show the time, as four red seven-segment digits
+   * @param {string} timeString - like 5:00, or 59.84 under a minute
+   * @param {boolean} isDanger - the last minute: the digits glow brighter
    */
   updateTimerDisplay(timeString, isDanger = false) {
-    const ctx = this.timerContext;
-    const w = this.timerCanvas.width;
-    const h = this.timerCanvas.height;
-
-    // Clear to transparent (no background panel)
-    ctx.clearRect(0, 0, w, h);
-
-    // Time digits — red, brighter in danger mode
-    const color = isDanger ? '#ff2040' : '#e94560';
-    ctx.fillStyle = color;
-    ctx.font = 'bold 64px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(timeString, w / 2, h / 2);
-
-    // Glow effect — stronger in danger mode
-    ctx.shadowColor = color;
-    ctx.shadowBlur = isDanger ? 25 : 15;
-    ctx.fillText(timeString, w / 2, h / 2);
+    this._timerText = timeString;
+    this._timerDanger = isDanger;
+    const { ctx, canvas, texture } = this._timerScreen;
+    const { left, right, separator } = timerCells(timeString);
+    const lit = isDanger ? '#ff2a1f' : '#e8160c';
+    const unlit = '#2a0d0b';
+    ctx.fillStyle = '#0a0a0b';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.shadowColor = lit;
+    const digitW = 92, digitH = 184, top = 32;
+    const xs = [24, 132, 290, 398];
+    [...left, ...right].forEach((char, i) => {
+      ctx.shadowBlur = 0;
+      drawDigit(ctx, '8', xs[i], top, digitW, digitH, unlit, unlit);
+      ctx.shadowBlur = isDanger ? 18 : 12;
+      drawDigit(ctx, char, xs[i], top, digitW, digitH, lit, 'rgba(0, 0, 0, 0)');
+    });
+    // The separator: two dots for minutes, one low dot for seconds
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = lit;
+    const dots = separator === ':' ? [top + digitH * 0.32, top + digitH * 0.68] : [top + digitH - 10];
+    dots.forEach(y => { ctx.beginPath(); ctx.arc(256, y, 11, 0, Math.PI * 2); ctx.fill(); });
     ctx.shadowBlur = 0;
-
-    this.timerTexture.needsUpdate = true;
-
-    // Pulse the emissive intensity in danger mode
-    if (this.timerMesh) {
-      this.timerMesh.material.emissiveIntensity = isDanger ? 1.2 : 0.6;
-    }
-  }
-
-  /* ----------------------------------------------------------
-     STRIKE INDICATORS — Two "X" LEDs near the timer
-  ---------------------------------------------------------- */
-  _buildStrikeIndicators() {
-    const strikeSize = 0.08;
-
-    for (let i = 0; i < 2; i++) {
-      const strikeGroup = new THREE.Group();
-
-      // X shape: two crossed bars
-      const barGeo = new THREE.BoxGeometry(strikeSize * 1.5, strikeSize * 0.3, 0.01);
-      const barMat = new THREE.MeshStandardMaterial({
-        color: 0x2a2a3a,
-        emissive: 0x2a2a3a,
-        emissiveIntensity: 0.1,
-        roughness: 0.5,
-        metalness: 0.4,
-      });
-
-      const bar1 = new THREE.Mesh(barGeo, barMat.clone());
-      bar1.rotation.z = Math.PI / 4;
-      strikeGroup.add(bar1);
-
-      const bar2 = new THREE.Mesh(barGeo, barMat.clone());
-      bar2.rotation.z = -Math.PI / 4;
-      strikeGroup.add(bar2);
-
-      // Circle backing
-      const backGeo = new THREE.CircleGeometry(strikeSize * 0.9, 16);
-      const backMat = new THREE.MeshStandardMaterial({
-        color: 0x0f0f1a,
-        roughness: 0.9,
-        side: THREE.DoubleSide,
-      });
-      const back = new THREE.Mesh(backGeo, backMat);
-      back.position.z = -0.005;
-      strikeGroup.add(back);
-
-      // Position below the timer display within the timer slot
-      const xOffset = (i - 0.5) * 0.3;
-      strikeGroup.position.set(
-        xOffset,
-        -SLOT_SIZE * 0.25,
-        0.005
-      );
-
-      this.timerGroup.add(strikeGroup);
-
-      this.strikeMeshes.push({
-        group: strikeGroup,
-        bar1: bar1,
-        bar2: bar2,
-        active: false,
-      });
-    }
+    texture.needsUpdate = true;
   }
 
   /**
-   * Activate a strike indicator (light it up red)
+   * Light or darken one of the two strike marks
    */
   setStrike(strikeIndex, active = true) {
-    if (strikeIndex >= this.strikeMeshes.length) return;
+    if (strikeIndex >= this._strikes.length) return;
+    this._strikes[strikeIndex] = active;
+    this._drawStrikes();
+  }
 
-    const strike = this.strikeMeshes[strikeIndex];
-    strike.active = active;
-
-    const color = active ? 0xe94560 : 0x2a2a3a;
-    const intensity = active ? 1.5 : 0.1;
-
-    [strike.bar1, strike.bar2].forEach(bar => {
-      bar.material.color.setHex(color);
-      bar.material.emissive.setHex(color);
-      bar.material.emissiveIntensity = intensity;
+  _drawStrikes() {
+    const { ctx, canvas, texture } = this._strikeScreen;
+    ctx.fillStyle = '#0a0a0b';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    this._strikes.forEach((isLit, i) => {
+      ctx.shadowColor = '#e8160c';
+      ctx.shadowBlur = isLit ? 12 : 0;
+      drawStrike(ctx, 46 + i * 112, 20, 52, 62, isLit, '#e8160c', '#2a0d0b');
     });
+    ctx.shadowBlur = 0;
+    texture.needsUpdate = true;
   }
 
   /* ----------------------------------------------------------
@@ -527,7 +457,7 @@ export class BombModel {
       this.setSlotActive(slot.id, false);
       this.setSlotHighlight(slot.id, false);
     });
-    this.strikeMeshes.forEach((_, i) => this.setStrike(i, false));
+    this._strikes.forEach((_, i) => this.setStrike(i, false));
     this.updateTimerDisplay('5:00');
     this.hideOutline();
   }
@@ -600,4 +530,16 @@ export class BombModel {
     });
     return meshes;
   }
+}
+
+// A canvas shown on a screen of a model, unlit so it glows like a display
+function makeScreen(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.flipY = false; // glTF UVs start at the top
+  texture.anisotropy = 8;
+  return { canvas, ctx: canvas.getContext('2d'), texture, material: new THREE.MeshBasicMaterial({ map: texture }) };
 }

@@ -1,6 +1,6 @@
-# Keep Talking and Nobody Explodes clone
+# Talk to Defuse
 
-A browser clone of Keep Talking and Nobody Explodes: one player defuses a 3D bomb, another reads the manual, and they talk it through.
+A browser game inspired by Keep Talking and Nobody Explodes: one player defuses a 3D bomb, another reads the manual, and they talk it through.
 
 ## Read first
 

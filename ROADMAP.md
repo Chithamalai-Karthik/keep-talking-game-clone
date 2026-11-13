@@ -1,11 +1,11 @@
-# Keep Talking and Nobody Explodes clone roadmap
+# Talk to Defuse roadmap
 
 The plan for this project: what is built, what comes next and why. The project board (`board/`) shows it as a kanban
-board: `python board/serve.py`. Format: `board/FORMAT.md`. Last updated 2 November 2026.
+board: `python board/serve.py`. Format: `board/FORMAT.md`. Last updated 13 November 2026.
 
 ## About the project
 
-A browser clone of Keep Talking and Nobody Explodes: one player defuses a 3D bomb, another reads the manual, and they talk it through.
+A browser game inspired by Keep Talking and Nobody Explodes: one player defuses a 3D bomb, another reads the manual, and they talk it through.
 
 The Defuser sees the bomb and the Expert sees only the manual, so everything the Expert learns has to be said aloud. The aim is the full game: all 14 modules as real 3D objects on the bomb, an Expert manual, built-in voice chat with room codes, and sound and polish.
 
@@ -127,7 +127,7 @@ All 14 modules, the Expert manual and custom games. Two people can play fully at
 | 27 | **Passwords.** Spinning letter columns and a submit button. | M | 2027-02-20 | Done 2026-11-02 |
 | 28 | **Needy modules.** The three modules that demand attention throughout the game. | XL | 2027-03-07 | In progress: built; the user will check the needy behaviour against the original |
 | 29 | **Expert manual.** A web manual for every module and appendix, wired to the menu button. | XL | 2027-03-21 | In progress: the user is reviewing the wording and choosing a page style |
-| 30 | **Custom games.** Choose timer, strikes and modules, and share a seed for the same bomb. | M | 2027-03-28 | Next |
+| 30 | **Custom games.** Choose the timer, modules, needy modules and hardcore in the Free Play case. | M | 2027-03-28 | Done 2026-11-13 |
 
 Step 28 is built in parts:
 
@@ -170,6 +170,8 @@ Decisions for Phase D:
 - The Morse Code dial steps through the manual's 16 frequencies and stops at each end, starting on 3.505 MHz (2026-11-02). This is from memory of the original; the manual's picture shows 3.500, which isn't a frequency in its table.
 - Morse Code flashes last 0.25 and 0.75 seconds, with gaps of 0.25 within a letter, 0.75 between letters and 3 before the word repeats (2026-11-02). The manual only says short, long and very long, so these are my choice, and the lamp is silent.
 - Who's on First and Memory change stage as the original does, seen by the user in a stream (2026-11-02): the display clears, the buttons sink one by one, the labels change while they are hidden, the buttons rise one by one, and the display comes back last. Buttons ignore clicks until then. The change takes 1.0 second on Memory and 1.4 on Who's on First; those timings are my choice.
+- Custom games are a Free Play case on the office desk, from the user's references (2026-11-13): time from 1 to 10 minutes in half minutes, 1 to 11 modules, needy modules on or off (one, or two on bombs of six modules or more, always fitting the 11 slots), and Hardcore, where one strike explodes the bomb (from my memory of the original). Its screen explains each control in our words, and the Estimated Difficulty gauge is our own estimate from modules per minute, needy and hardcore. The case remembers its last settings in the browser. The case opens like a briefcase, its lid hinged on the long back edge, and is held with that hinge upright so its two panels stand side by side (2026-11-13, the user's correction). Sharing a seed for the same bomb moved to Later (2026-11-13, the user's decision): it isn't in the original, and nothing depends on it.
+- The timer is a modelled module like the original's (2026-11-13, from `references/Original game bomb reference.png`): no module frame, a raised silver box with red seven-segment digits whose unlit segments show faintly, a small strike box with two X marks above it, and a round speaker. It shows 05:00 style minutes, and seconds with hundredths in the last minute if the game sends them.
 
 ## Phase G: VR
 
@@ -183,13 +185,13 @@ Step 46 is built in parts:
 
 | Part | What | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
-| 46a | Move the game onto IWSDK and its Three.js build, with the desktop game unchanged. | M | 2027-04-04 | Not started |
+| 46a | Move the game onto IWSDK and its Three.js build, with the desktop game unchanged. | M | 2027-04-04 | Next |
 | 46b | Separate input from the mouse, so clicks and VR drive the same game actions. | M | 2027-04-10 | Not started |
 | 46c | Enter and leave VR, from the menu and during a game, with the button only on supported devices. | S | 2027-04-11 | Not started |
 | 46d | The VR room: desk height, where the player stands, and real-world scale. | M | 2027-04-18 | Not started |
 | 46e | Pick up, hold and rotate the bomb with controllers and with hands. | M | 2027-04-24 | Not started |
 | 46f | Use every module with controllers and hands, including held parts, wires, dials and small buttons. | L | 2027-05-01 | Not started |
-| 46g | A new menu matching the original game's, shared by the browser and VR, with difficulty, hints and game over. | L | 2027-05-08 | Not started |
+| 46g | A new menu matching the original game's, shared by the browser and VR, with difficulty, hints and game over. | L | 2027-05-08 | Done 2026-11-13 |
 | 46h | Sound placed in the room, and vibration on presses and strikes. | S | 2027-05-09 | Not started |
 | 46i | Headset performance: frame rate, shadows and sharp text. | M | 2027-05-16 | Not started |
 | 46j | A full play test on the headset, with an Expert in the same room. | S | 2027-05-22 | Not started |
@@ -199,6 +201,12 @@ Decisions for Phase G:
 - VR is part of the same game, not a separate mode (2026-11-02, the user's decision). One site, with an Enter VR button on the menu and during a game. Mouse clicks and VR must both work, so every step from here keeps the browser game working.
 - Use IWSDK, not plain Three.js VR (2026-11-02, the user's decision). It gives ready-made grabbing, pointers and panels, so the whole game moves onto its Three.js build and dev tools in part 46a.
 - The menu is redesigned to match the original game's, and the same menu serves the browser and VR (2026-11-02, the user's decision). HTML screens can't appear in VR, so this replaces them. It needs reference images of the original menu before part 46g.
+- Part 46g starts early, before 46a (2026-11-13, agreed with the user). The menu is built as 3D objects in the current Three.js, so it moves to IWSDK with the rest of the game. It copies the original's idea: an office seen from a chair, a Bombs binder whose contents page lists the levels, and a Menu folder with the controls and options. The models and page text are our own.
+- The game is called Talk to Defuse (2026-11-13, the user's choice). The original's name stays out of the title and the menu; the docs say the game is inspired by it.
+- The title shows over the desk view in the browser only (2026-11-13, the user's decision). A browser page feels empty without one; a standalone or VR view doesn't need it.
+- The title font is Special Elite, a free Google Font (Apache 2.0), not the original's font (2026-11-13). The hint line sits at the bottom of the screen (the user's choice).
+- All four levels are open from the start, with no ticks for beaten levels (2026-11-13, the user's decision).
+- First pass of 46g done (2026-11-13): the office room, the binder with its contents and level pages, and the folder with the controls card and the Expert Manual. The game is played in a separate dark bomb room, as in the original, with a fade between the rooms and a desk clock showing the real time (2026-11-13, from the user's reference). The Menu folder also lies on the bomb room's desk as the in-game menu: Restart this bomb and Back to the office, without the Expert Manual (the user's decision); the timer keeps running while it is open (2026-11-13, the user's decision to add it; running timer is my choice). The bomb room's light is soft and even, with its own light balance, and its back wall has an alarm light, a speaker and conduit from the user's second reference (2026-11-13). The desk clock's alarm rings now and then as a distraction, like the original: click it to snooze, or it stops after 30 seconds; it never causes a strike (2026-11-13, the user's request; the timing is my choice). The clock is picked up before snooze can be pressed, as in the original: a click lifts it (putting the bomb down), and right click, Esc or a click off the clock puts it back (2026-11-13, the user's description). The game-over overlay is replaced by a results report in the binder over a black screen, with Back and Retry, from the user's reference (2026-11-13). Options in the office folder has Sound, with the sound effect volume saved in the browser; Music, Graphics, Vibration, Leaderboards and Credits are left out until the game has something behind them (2026-11-13, my call from the user's reference). The binder has real rings (2026-11-13). The report names the module whose strike set the bomb off (2026-11-13, the user's request).
 - Controllers and hands both come in the first version (2026-11-02, the user's decision), as IWSDK supports both.
 - The first VR version has the Expert in the same room, with voice chat from the headset later as step 47 (2026-11-02, agreed with the user).
 - VR comes before voice chat and release (2026-11-02, the user's decision, replacing the earlier plan to do it after release). Voice chat and release move back eight weekends, and the end date moves from 2027-06-06 to 2027-07-17.
@@ -240,6 +248,7 @@ The game feels finished, works across browsers, and is ready to deploy.
 - A text chat fallback for when voice isn't available.
 - Live sync between players (visible actions, shared timer): the plan marks this optional, and it isn't needed for the game to work.
 - Push-to-talk.
+- A seed: a short code that rebuilds exactly the same bomb, so two Defuser teams can play an identical one (moved from step 30 on 2026-11-13).
 
 ## Risks and open questions
 

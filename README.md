@@ -1,10 +1,10 @@
-# Keep Talking and Nobody Explodes clone
+# Talk to Defuse
 
-A browser clone of Keep Talking and Nobody Explodes: one player defuses a 3D bomb, another reads the manual, and they talk it through.
+A browser game inspired by Keep Talking and Nobody Explodes: one player defuses a 3D bomb, another reads the manual, and they talk it through.
 
 The Defuser sees the bomb and the Expert sees only the manual, so everything the Expert learns has to be said aloud. All game logic runs in the Defuser's browser, with no game server.
 
-**Status:** the menus, 3D bomb, timer, strikes and game-over screens are built. All eleven regular modules are built, with core sound effects: Wires, The Button, Keypads, Simon Says, Who's on First, Memory, Morse Code, Complicated Wires, Wire Sequences, Mazes and Passwords. The three needy modules are built too: Venting Gas, Capacitor Discharge and Knob. See `ROADMAP.md`.
+**Status:** the office, the bomb room, the desk menu (a Bombs binder, a Free Play case and a Menu folder, with Options), the 3D bomb, timer, strikes and the results report are built. All eleven regular modules are built, with core sound effects: Wires, The Button, Keypads, Simon Says, Who's on First, Memory, Morse Code, Complicated Wires, Wire Sequences, Mazes and Passwords. The three needy modules are built too: Venting Gas, Capacitor Discharge and Knob. See `ROADMAP.md`.
 
 ## Setup
 
@@ -27,7 +27,7 @@ npm test          # run the automated tests
 
 ## Using it
 
-Choose **Play**, then a difficulty. **Expert Manual** opens the manual in a new tab, for the Expert to scroll or print, in a Field manual or Dossier style; it's also at `/manual.html`. The Settings and How to Play buttons aren't connected yet.
+The game opens at a desk in an office. Click the **Bombs** binder to lift it and open it: its contents page lists the four levels, a click on one shows its brief, and **Start** takes you to the bomb room with that bomb on the desk. Click the black **Free Play** case to set up your own bomb: the time (1 to 10 minutes), how many modules, needy modules on or off, and Hardcore (one strike explodes it); its screen explains each control and a gauge estimates the difficulty, and **Start** arms it. The case remembers its last settings. Click the **Menu** folder for the controls, **Options** (the sound effect volume, remembered in this browser) and the **Expert Manual**, which opens in a new tab for the Expert to scroll or print, in a Field manual or Dossier style; it's also at `/manual.html`. Right click, Esc or a click beside the binder or folder puts it back down. In the bomb room, the **Menu** folder beside the bomb offers **Restart this bomb** and **Back to the office**; it can be picked up while the bomb is down on the desk, and the timer keeps running while it is open. When the bomb explodes or is defused, the screen goes black and the binder opens on a report: the level, the bomb, a stamp saying EXPLODED or DEFUSED, the time remaining and what set it off: the module that gave the final strike, or time running out. **Retry** gives a new bomb of the same level, and **Back** returns to the office. Options aren't built yet.
 
 | Control | Action |
 | --- | --- |
@@ -47,7 +47,9 @@ Choose **Play**, then a difficulty. **Expert Manual** opens the manual in a new 
 
 Needy modules can't be solved and don't count towards defusing the bomb. They wake from time to time, and take a strike if their red countdown ends before they are tended.
 
-Testing keys during a game: `T` skips 30 seconds, `K` adds a strike, `N` wakes the needy modules, `G` explodes the bomb and `W` wins. These only work in development (`npm run dev`).
+The alarm clock on the bomb room's desk rings now and then, beeping and flashing. Click the clock to pick it up (this puts the bomb down), then click its SNOOZE bar; right click, Esc or a click anywhere off the clock puts it back. Left alone, it stops after 30 seconds. It's only a distraction and never causes a strike.
+
+Testing keys during a game: `T` skips 30 seconds, `K` adds a strike, `N` wakes the needy modules, `A` rings the desk clock's alarm, `G` explodes the bomb and `W` wins. These only work in development (`npm run dev`).
 
 ## Project board
 

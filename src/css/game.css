@@ -1,6 +1,6 @@
 /* ============================================================
    KTANE Clone — Game Screen Styles
-   Module overlay container, game hints, game-over states
+   Module overlay container, game hints, and the fade between rooms
    (HUD removed — timer/strikes are physically on the 3D bomb)
    ============================================================ */
 
@@ -114,128 +114,6 @@
   color: var(--color-accent-red);
 }
 
-/* --- Game Over Overlay --- */
-.game-over-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-  pointer-events: auto;
-  animation: fadeIn var(--transition-slow) ease-out;
-}
-
-.game-over-overlay.explosion {
-  background: radial-gradient(
-    circle at center,
-    rgba(233, 69, 96, 0.3) 0%,
-    rgba(10, 10, 20, 0.95) 60%
-  );
-}
-
-.game-over-overlay.defused {
-  background: radial-gradient(
-    circle at center,
-    rgba(46, 204, 113, 0.2) 0%,
-    rgba(10, 10, 20, 0.95) 60%
-  );
-}
-
-.game-over-title {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 6vw, 4rem);
-  font-weight: 900;
-  letter-spacing: 0.15em;
-  margin-bottom: var(--space-lg);
-}
-
-.game-over-overlay.explosion .game-over-title {
-  color: var(--color-accent-red);
-  text-shadow: 0 0 40px rgba(233, 69, 96, 0.6);
-}
-
-.game-over-overlay.defused .game-over-title {
-  color: var(--color-accent-green);
-  text-shadow: 0 0 40px rgba(46, 204, 113, 0.6);
-}
-
-.game-over-subtitle {
-  font-family: var(--font-heading);
-  font-size: clamp(0.9rem, 2vw, 1.2rem);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-2xl);
-}
-
-.game-over-btn {
-  padding: var(--space-md) var(--space-2xl);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  font-family: var(--font-heading);
-  font-size: 1rem;
-  font-weight: 600;
-  letter-spacing: 0.15em;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-}
-
-.game-over-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
-}
-
-.game-over-btn-secondary {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.08);
-  font-size: 0.85rem;
-}
-
-.game-over-actions {
-  display: flex;
-  gap: var(--space-lg);
-  margin-top: var(--space-lg);
-}
-
-.game-over-stats {
-  display: flex;
-  gap: var(--space-xl);
-  margin-bottom: var(--space-xl);
-}
-
-.game-over-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: var(--space-md) var(--space-lg);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--radius-md);
-  min-width: 80px;
-}
-
-.game-over-stat-label {
-  font-family: var(--font-heading);
-  font-size: 0.6rem;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-}
-
-.game-over-stat-value {
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
 /* Screen shake for explosion */
 @keyframes screenShake {
   0%, 100% { transform: translate(0, 0); }
@@ -259,13 +137,24 @@
   .game-hint span {
     font-size: 0.7rem;
   }
+}
 
-  .game-over-stats {
-    gap: var(--space-md);
-  }
+/* --- Fade between rooms --- */
+#screen-fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  z-index: 1000;
+}
 
-  .game-over-actions {
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
+#screen-fade.black {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#screen-fade.instant {
+  transition: none;
 }

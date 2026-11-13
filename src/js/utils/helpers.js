@@ -71,20 +71,3 @@ export function generateRoomCode(length = 4) {
   }
   return code;
 }
-
-/**
- * Create floating particles for menu background
- */
-export function createMenuParticles(container, count = 30) {
-  for (let i = 0; i < count; i++) {
-    const particle = document.createElement('div');
-    particle.className = 'particle';
-    particle.style.left = `${Math.random() * 100}%`;
-    particle.style.bottom = `${-10 - Math.random() * 20}%`;
-    particle.style.animationDuration = `${8 + Math.random() * 12}s`;
-    particle.style.animationDelay = `${Math.random() * 10}s`;
-    particle.style.width = `${2 + Math.random() * 3}px`;
-    particle.style.height = particle.style.width;
-    container.appendChild(particle);
-  }
-}

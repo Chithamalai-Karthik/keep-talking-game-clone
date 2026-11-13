@@ -52,10 +52,12 @@ export class SceneManager {
     // Hemisphere light — warm sky / cool ground for natural ambient
     const hemiLight = new THREE.HemisphereLight(0xffecd2, 0x1a1a2e, 0.6);
     this.scene.add(hemiLight);
+    this.hemiLight = hemiLight;
 
     // Ambient light — warm base illumination
     const ambient = new THREE.AmbientLight(0xfff5e6, 0.5);
     this.scene.add(ambient);
+    this.ambientLight = ambient;
 
     // Key light — bright warm directional from upper-right
     this.mainLight = new THREE.DirectionalLight(0xfff0d6, 2.5);
@@ -77,11 +79,26 @@ export class SceneManager {
     const fillLight = new THREE.DirectionalLight(0x8ec8ff, 0.6);
     fillLight.position.set(-4, 3, -2);
     this.scene.add(fillLight);
+    this.fillLight = fillLight;
 
     // Back rim light — subtle warm edge light from behind
     const rimLight = new THREE.DirectionalLight(0xffe0b2, 0.4);
     rimLight.position.set(-1, 4, -5);
     this.scene.add(rimLight);
+    this.rimLight = rimLight;
+  }
+
+  /**
+   * Set the strength of the shared lights, for the room being shown
+   * @param {{ key: number, hemi: number, ambient: number, fill: number, rim: number, shadowRadius: number }} lighting
+   */
+  setLighting({ key, hemi, ambient, fill, rim, shadowRadius }) {
+    this.mainLight.intensity = key;
+    this.hemiLight.intensity = hemi;
+    this.ambientLight.intensity = ambient;
+    this.fillLight.intensity = fill;
+    this.rimLight.intensity = rim;
+    this.mainLight.shadow.radius = shadowRadius;
   }
 
   _onResize() {

@@ -7,7 +7,7 @@ with a comment saying what it does. ROADMAP.md says what is built and what comes
 
 | File | What it does |
 | --- | --- |
-| `index.html` | the game page: canvas container, menu, difficulty, game and game-over screens |
+| `index.html` | the game page: canvas container, the title over the desk menu, the game screen's hint, and the fade between rooms |
 | `manual.html` | the Expert manual page |
 | `vite.config.js` | builds both pages |
 | `package.json` | scripts and dependencies |
@@ -23,7 +23,16 @@ with a comment saying what it does. ROADMAP.md says what is built and what comes
 
 | File | What it does |
 | --- | --- |
-| `main.js` | entry point: wires everything together; timer, strikes, game flow, input handling and debug keys |
+| `main.js` | entry point: wires everything together; timer, strikes, game flow, moving between rooms, the alarm clock, input handling and debug keys |
+
+## `src/js/menu/`
+
+The menu is the Bombs binder and the Menu folder on the desk, not HTML screens, so it can also work in VR.
+
+| File | What it does |
+| --- | --- |
+| `DeskMenu.js` | the binder, Free Play case and folder on the office desk, the in-game folder on the bomb room's desk, and the binder's results report after a game: hover rim, lifting and opening them, page clicks, and moving the camera |
+| `MenuPages.js` | what the binder and folder pages say and where their clickable lines are: the levels, their facts, the results report, the controls card, the menu, Options and Sound sheets, and the Free Play case's lid, controls and info screen |
 
 ## `src/js/manual/`
 
@@ -39,13 +48,15 @@ The Expert manual, a page of its own that never sees a live bomb.
 
 | File | What it does |
 | --- | --- |
-| `SceneManager.js` | Three.js scene, camera, renderer, lights and render loop |
-| `BombModel.js` | the 3D bomb: loads the casing and widget models, and builds slots with their empty-slot covers, timer display, strike lights and side panels |
+| `SceneManager.js` | Three.js scene, camera, renderer, lights (with each room's light strengths) and render loop |
+| `BombModel.js` | the 3D bomb: loads the casing, widget and timer models, and builds slots with their empty-slot covers, the timer's digits and strike marks, and side panels |
 | `BombController.js` | bomb states and animation: pick up, put down, right-drag to rotate, focus a module |
 | `Raycaster.js` | detects clicks and hovers on 3D objects |
 | `ModelLoader.js` | loads and caches `.glb` models exported from Blender, and textures |
+| `SevenSegment.js` | seven-segment digits and strike marks, drawn for the timer's two screens |
+| `DeskClock.js` | the bomb room's alarm clock as an object: picking it up, its SNOOZE bar, pressing it and putting it down |
 | `TextLabel.js` | flat text labels for widgets and modules, and freeing them again |
-| `RoomEnvironment.js` | the desk, floor, walls and lamp |
+| `Rooms.js` | the office (menu) and the bomb room (game), their lights and light balance, and the bomb room's desk clock display (its time and flashing), and the scale from real metres to game units |
 
 ## `src/js/game/`
 
@@ -88,6 +99,8 @@ Module rules with no 3D code, so they can be tested without a renderer.
 | `WireSequencesRules.js` | the occurrence tables, panel generation, cutting and moving between panels |
 | `NeedyTimer.js` | when a needy module wakes, its countdown, and adding time back |
 | `VentingRules.js` | the Venting Gas questions and what each answer does |
+| `FreePlayRules.js` | Free Play: the case's settings and their limits, the bomb config they make, and the estimated difficulty |
+| `AlarmClockRules.js` | when the bomb room's desk clock rings, its beeps and flashing, and snooze |
 | `KnobRules.js` | the Knob's light patterns, and reading its position against the UP label |
 | `PasswordRules.js` | letter columns that spell one listed word only, cycling and submitting |
 | `MazeRules.js` | the nine mazes, puzzle generation and moving the light |
@@ -101,9 +114,10 @@ Module rules with no 3D code, so they can be tested without a renderer.
 | File | What it does |
 | --- | --- |
 | `src/js/audio/Sounds.js` | sound effects, all generated with the Web Audio API; add a new sound to `SOUNDS` |
-| `src/js/ui/MenuUI.js` | menu buttons and switching between screens |
+| `src/js/ui/MenuUI.js` | switching between the menu and game screens, and hiding the title while a prop is held up |
 | `src/js/utils/constants.js` | difficulty presets, module IDs and names, wire colours, game data lists |
-| `src/js/utils/helpers.js` | random, serial and time-format helpers, and the menu particles |
+| `src/js/utils/helpers.js` | random, serial and time-format helpers |
+| `src/js/utils/settings.js` | the player's options (the sound effect volume and the Free Play case's last settings), kept in this browser |
 
 ## `src/css/`
 
@@ -111,8 +125,8 @@ Module rules with no 3D code, so they can be tested without a renderer.
 | --- | --- |
 | `index.css` | design tokens and global styles |
 | `animations.css` | shared keyframe animations |
-| `menu.css` | main menu and difficulty screen |
-| `game.css` | game screen, hint and game-over overlay |
+| `menu.css` | the title over the desk menu |
+| `game.css` | game screen, hint, the explosion shake and the fade between rooms |
 | `manual.css` | the Expert manual: its Field manual and Dossier styles, and the planned A4 print layout |
 
 ## `tests/`
@@ -138,6 +152,10 @@ Module rules with no 3D code, so they can be tested without a renderer.
 | `MorseRules.test.js` | the Morse Code tables, the lamp's timing and looping, tuning, and every word on every frequency |
 | `PanelChange.test.js` | the timing of a Wire Sequences panel change |
 | `StageChange.test.js` | the order and timing of a change of stage |
+| `FreePlayRules.test.js` | Free Play's controls and limits, needy modules fitting, hardcore and the difficulty estimate |
+| `AlarmClockRules.test.js` | when the desk clock rings, beeps, snoozes and gives up |
+| `SevenSegment.test.js` | the timer's digit segments, and laying out minutes or seconds as four digits |
+| `MenuPages.test.js` | the binder's levels, their facts and briefs, the results report, the menu sheets' choices, volume steps, and finding the clicked line on a page |
 | `Sounds.test.js` | sounds stay safe without browser audio, and every Simon Says colour has a tone |
 
 ## Other folders
@@ -147,4 +165,4 @@ Module rules with no 3D code, so they can be tested without a renderer.
 | `docs/` | original plans and notes; some are out of date, and `ROADMAP.md` wins where they differ |
 | `public/assets/models/` | `.glb` models exported from Blender, loaded by the game |
 | `public/assets/keypad/` | the 27 Keypads symbols, drawn from DejaVu fonts, one image each, named as in `rules/KeypadRules.js` |
-| `models/` | Blender source files for the models; edit these, then export the `.glb` again |
+| `models/` | Blender source files for the models: `bomb_casing.blend` for the bomb and modules, `office.blend` for the office (collection `office`), the binder, Free Play case and folder (collection `menu`) and the bomb room (collection `bombroom`); edit these, then export the `.glb` again |

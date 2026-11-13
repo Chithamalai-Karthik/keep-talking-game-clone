@@ -6,15 +6,20 @@
 
 import { SceneManager } from './three/SceneManager.js';
 import { BombModel } from './three/BombModel.js';
-import { RoomEnvironment } from './three/RoomEnvironment.js';
+import { createOffice, createBombRoom } from './three/Rooms.js';
+import { DeskMenu } from './menu/DeskMenu.js';
 import { BombController, BOMB_STATE } from './three/BombController.js';
 import { Raycaster } from './three/Raycaster.js';
 import { MenuUI } from './ui/MenuUI.js';
-import { DIFFICULTY, strikeSpeed } from './utils/constants.js';
-import { createMenuParticles, displayTime, formatTime } from './utils/helpers.js';
-import { playSound, unlockAudio } from './audio/Sounds.js';
+import { DIFFICULTY, MODULE_NAMES, strikeSpeed } from './utils/constants.js';
+import { displayTime, formatTime } from './utils/helpers.js';
+import { playSound, unlockAudio, setEffectsVolume } from './audio/Sounds.js';
+import { loadSettings, saveSettings, stepVolume } from './utils/settings.js';
+import { cleanFreePlay } from './game/rules/FreePlayRules.js';
+import { DeskClock } from './three/DeskClock.js';
 import { BombState } from './game/BombState.js';
 import { ModuleManager } from './game/ModuleManager.js';
+import { AlarmClock } from './game/rules/AlarmClockRules.js';
 import './game/PlaceholderModule.js'; // Register placeholder modules
 import './game/WiresModule.js';
 import './game/ButtonModule.js';
@@ -31,11 +36,26 @@ import './game/VentingModule.js';
 import './game/CapacitorModule.js';
 import './game/KnobModule.js';
 
+const FADE_MS = 350;
+
+/**
+ * Fade the screen to black or back, for moving between rooms
+ */
+function fadeScreen(toBlack, instant = false) {
+  const fade = document.getElementById('screen-fade');
+  if (!fade) return Promise.resolve();
+  fade.classList.toggle('instant', instant);
+  fade.classList.toggle('black', toBlack);
+  return new Promise(resolve => setTimeout(resolve, instant ? 0 : FADE_MS));
+}
+
 class App {
   constructor() {
     this.sceneManager = null;
     this.bombModel = null;
-    this.room = null;
+    this.office = null;
+    this.bombRoom = null;
+    this.deskMenu = null;
     this.bombController = null;
     this.raycaster = null;
     this.menuUI = null;
@@ -45,6 +65,10 @@ class App {
     this.isGameActive = false;
     this.currentDifficulty = null;
     this.bombState = null;
+    this.alarm = null;               // The desk clock's alarm, during a game
+    this.deskClock = null;           // The clock itself, which can be picked up
+    this.settings = loadSettings();
+    this._gameOverToken = 0;         // Cancels a report still waiting to show
     this._hintTimeout = null;
     this._heldPart = null;           // { slotId, partId } while a module part is held down
     this._ignoreClick = false;       // The click that ends a hold is not a click on the bomb
@@ -62,17 +86,10 @@ class App {
 
   _init() {
     window.addEventListener('pointerdown', unlockAudio);
+    setEffectsVolume(this.settings.effectsVolume);
 
-    // --- MENU SETUP FIRST (so buttons always work) ---
+    // The title over the desk, and switching to the game screen
     this.menuUI = new MenuUI();
-    this.menuUI.onDifficultySelected((difficulty) => this._startGame(difficulty));
-    this.menuUI.onManual(() => window.open(`${import.meta.env.BASE_URL}manual.html`, '_blank'));
-
-    // Create menu particles
-    const particleContainer = document.getElementById('menu-particles');
-    if (particleContainer) {
-      createMenuParticles(particleContainer, 35);
-    }
 
     // --- THREE.JS SETUP ---
     try {
@@ -80,9 +97,19 @@ class App {
       const container = document.getElementById('canvas-container');
       this.sceneManager = new SceneManager(container);
 
-      // Create room environment
-      this.room = new RoomEnvironment();
-      this.sceneManager.add(this.room.getObject());
+      // The office holds the menu; the bomb room is where the game is played
+      this.office = createOffice();
+      this.bombRoom = createBombRoom();
+      for (const room of [this.office, this.bombRoom]) this.sceneManager.add(room.getObject());
+      this.office.load().catch(err => console.error('[KTANE] Office failed to load:', err));
+      this.bombRoom.load()
+        .then(() => {
+          const clock = this.bombRoom.getObject().getObjectByName('br_clock_root');
+          this.deskClock = new DeskClock(clock, this.sceneManager.camera, this.sceneManager.renderer.domElement);
+        })
+        .catch(err => console.error('[KTANE] Bomb room failed to load:', err));
+      this.bombRoom.setVisible(false);
+      this.sceneManager.setLighting(this.office.lighting);
 
       // Create bomb model
       this.bombModel = new BombModel();
@@ -112,6 +139,9 @@ class App {
       // The right button rotates and deselects, so it never opens the menu
       canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+      // The desk clock: a click picks it up, and a click on its bar while held is snooze
+      canvas.addEventListener('click', (e) => this._onClockClick(e));
+
       // ESC to deselect + debug shortcuts
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') this._deselect();
@@ -126,8 +156,13 @@ class App {
           }
           if (e.key === 'k' || e.key === 'K') {
             // Trigger a strike
-            this._onStrike();
+            this._onStrike('Test key');
             console.log('[DEBUG] Triggered strike');
+          }
+          if (e.key === 'a' || e.key === 'A') {
+            // Ring the desk clock's alarm now
+            this.alarm?.ringNow();
+            console.log('[DEBUG] Rang the alarm clock');
           }
           if (e.key === 'n' || e.key === 'N') {
             // Wake every needy module now
@@ -136,7 +171,7 @@ class App {
           }
           if (e.key === 'g' || e.key === 'G') {
             // Trigger explosion
-            this._onGameOver(false);
+            this._onGameOver(false, 'Test key');
             console.log('[DEBUG] Triggered explosion');
           }
           if (e.key === 'w' || e.key === 'W') {
@@ -155,9 +190,28 @@ class App {
       this.raycaster.onHover((object) => this._onBombHover(object));
       this.raycaster.onHoverLeave((object) => this._onBombHoverLeave(object));
 
-      // --- INITIAL CAMERA POSITION (for menu cinematic orbit) ---
-      this.sceneManager.camera.position.set(3, 3.5, 4);
-      this.sceneManager.camera.lookAt(0, 0.5, 0);
+      // --- THE MENU ON THE DESK ---
+      this.bombModel.getObject().visible = false;
+      this.deskMenu = new DeskMenu(this.sceneManager.scene, this.sceneManager.camera, canvas, {
+        onStart: (difficulty) => this._enterBombRoom(difficulty),
+        onManual: () => window.open(`${import.meta.env.BASE_URL}manual.html`, '_blank'),
+        onRestart: () => this._restartBomb(),
+        onRetry: () => this._restartBomb(),
+        onLeave: () => this._backToOffice(),
+        onVolume: (step) => this._changeVolume(step),
+        getVolume: () => this.settings.effectsVolume,
+        getFreePlay: () => cleanFreePlay(this.settings.freePlay),
+        onFreePlayChange: (freePlay) => {
+          this.settings.freePlay = freePlay;
+          saveSettings(this.settings);
+        },
+        onLift: (lifted) => this.menuUI.setTitleHidden(lifted),
+        // In a game, the folder can be picked up only while the bomb is down on the desk
+        canUse: () => !this.isGameActive || (!this._gameOver && !this.deskClock?.isHeld()
+          && this.bombController.getState() === BOMB_STATE.ON_TABLE && !this.bombController.isAnimating()),
+      });
+      this.deskMenu.show(true);
+      this.deskMenu.load().catch(err => console.error('[KTANE] Menu model failed to load:', err));
 
       // Start render loop
       this.sceneManager.animate((delta, elapsed) => this._update(delta, elapsed));
@@ -172,19 +226,17 @@ class App {
      PER-FRAME UPDATE
   ---------------------------------------------------------- */
   _update(delta, elapsed) {
-    // Update bomb controller
-    this.bombController.update(delta);
-
-    // Menu state: slow cinematic orbit of the CAMERA (only on menu)
-    if (!this.isGameActive) {
-      const orbitRadius = 5.5;
-      const speed = 0.15;
-      this.sceneManager.camera.position.x = Math.sin(elapsed * speed) * orbitRadius;
-      this.sceneManager.camera.position.z = Math.cos(elapsed * speed) * orbitRadius;
-      this.sceneManager.camera.position.y = 2.5 + Math.sin(elapsed * 0.2) * 0.2;
-      this.sceneManager.camera.lookAt(0, 0.6, 0);
-      return;
+    // The desk menu also glides the camera between the chair and the bomb
+    this.deskMenu.update(delta);
+    if (this.alarm && !this._gameOver) {
+      const event = this.alarm.update(delta);
+      if (event === 'start' || event === 'beep') playSound('alarm');
     }
+    this.bombRoom.update(this.alarm?.displayOn ?? true);
+    this.deskClock?.update(delta);
+    if (!this.isGameActive) return;
+
+    this.bombController.update(delta);
 
     // --- Active game: countdown timer ---
     if (this.bombState && !this._gameOver) {
@@ -225,8 +277,9 @@ class App {
 
   /**
    * Increase timer speed after a strike
+   * @param {string} source - what gave the strike, named on the report if it sets the bomb off
    */
-  _onStrike() {
+  _onStrike(source) {
     const exploded = this.bombState.addStrike();
     this.bombModel.setStrike(this.bombState.strikes - 1, true);
 
@@ -241,7 +294,7 @@ class App {
     console.log(`[KTANE] STRIKE ${this.bombState.strikes}/${this.bombState.maxStrikes} — Timer speed: ${this._timerSpeed}x`);
 
     if (exploded) {
-      this._onGameOver(false);
+      this._onGameOver(false, source);
     } else {
       playSound('strike');
     }
@@ -253,83 +306,106 @@ class App {
   _onTimerExpired() {
     console.log('[KTANE] Timer expired — BOOM!');
     this.bombModel.updateTimerDisplay('0:00', true);
-    this._onGameOver(false);
+    this._onGameOver(false, 'Time ran out');
   }
 
   /**
-   * Game over (win or lose)
+   * Game over (win or lose): a moment on the bomb, then black, then the report in the binder
+   * @param {string|null} cause - why it exploded, for the report
    */
-  _onGameOver(won) {
+  _onGameOver(won, cause = null) {
+    if (this._gameOver) return;
     this._gameOver = true;
     this.moduleManager?.stop();
+    this.deskClock?.putDown();
     playSound(won ? 'defused' : 'explosion');
 
-    const overlay = document.getElementById('game-over-overlay');
-    const title = document.getElementById('game-over-title');
-    const subtitle = document.getElementById('game-over-subtitle');
-    const statsContainer = document.getElementById('game-over-stats');
+    const game = { level: this.currentDifficulty, won, timeRemaining: this.bombState.timeRemaining, cause };
+    const token = ++this._gameOverToken;
+    if (!won) fadeScreen(true, true); // An explosion goes black at once
 
-    // Set class for explosion vs defused styling
-    overlay.className = 'game-over-overlay ' + (won ? 'defused' : 'explosion');
-    overlay.style.display = '';
+    setTimeout(async () => {
+      if (token !== this._gameOverToken) return;
+      await fadeScreen(true);
+      this._hideHint();
+      this.bombModel.getObject().visible = false;
+      this.bombRoom.setVisible(false);
+      this.sceneManager.setLighting(this.office.lighting);
+      this.deskMenu.showResults(game);
+      await fadeScreen(false);
+    }, won ? 1500 : 1800);
 
-    // Title & subtitle
-    title.textContent = won ? 'DEFUSED' : 'EXPLOSION';
-    subtitle.textContent = won
-      ? 'The bomb has been safely defused!'
-      : 'The bomb detonated. Better luck next time.';
+    console.log(`[KTANE] ${won ? 'DEFUSED' : 'EXPLOSION'}${cause ? ` (${cause})` : ''} — ${displayTime(this.bombState.timeRemaining)} left, strikes ${this.bombState.strikes}/${this.bombState.maxStrikes}`);
+  }
 
-    // Stats
-    const timeUsed = this.bombState.timeLimit - this.bombState.timeRemaining;
-    const timeUsedText = formatTime(timeUsed);
-    const { regularModules } = this.bombState;
-    const solvedCount = regularModules.filter(m => m.solved).length;
-
-    statsContainer.innerHTML = `
-      <div class="game-over-stat">
-        <span class="game-over-stat-label">TIME</span>
-        <span class="game-over-stat-value">${timeUsedText}</span>
-      </div>
-      <div class="game-over-stat">
-        <span class="game-over-stat-label">STRIKES</span>
-        <span class="game-over-stat-value">${this.bombState.strikes}/${this.bombState.maxStrikes}</span>
-      </div>
-      <div class="game-over-stat">
-        <span class="game-over-stat-label">MODULES</span>
-        <span class="game-over-stat-value">${solvedCount}/${regularModules.length}</span>
-      </div>
-    `;
-
-    // Screen shake on explosion
-    if (!won) {
-      const canvas = this.sceneManager.renderer.domElement;
-      canvas.classList.add('screen-shake');
-      setTimeout(() => canvas.classList.remove('screen-shake'), 500);
+  /**
+   * The desk clock: pick it up (putting the bomb down first), or press snooze while it is held
+   */
+  _onClockClick(event) {
+    const clock = this.deskClock;
+    if (!clock || !this.isGameActive || this._gameOver || this.deskMenu.isHolding() || clock.isMoving()) return;
+    if (clock.isHeld()) {
+      if (clock.isSnoozeAt(event)) {
+        clock.pressSnooze();
+        this.alarm?.snooze();
+        playSound('press');
+      } else if (!clock.isAt(event)) {
+        clock.putDown(); // A click on the bomb, or anywhere off the clock, puts it down
+      }
+      return;
     }
+    if (!clock.isAt(event) || this.bombController.isAnimating() || this._heldPart) return;
+    const state = this.bombController.getState();
+    if (state === BOMB_STATE.HELD || state === BOMB_STATE.MODULE_FOCUSED) {
+      this.bombController.putDown();
+      this._hideHint();
+    }
+    this.raycaster.clearHover();
+    this.bombModel.hideOutline();
+    const { cameraTablePosition, cameraTableLookAt } = this.bombController;
+    clock.pickUp({ position: cameraTablePosition, lookAt: cameraTableLookAt });
+  }
 
-    // Wire up buttons
-    const playAgainBtn = document.getElementById('btn-play-again');
-    const backMenuBtn = document.getElementById('btn-back-menu');
+  /**
+   * Options: the sound effect volume, kept for next time
+   */
+  _changeVolume(step) {
+    this.settings.effectsVolume = stepVolume(this.settings.effectsVolume, step);
+    setEffectsVolume(this.settings.effectsVolume);
+    saveSettings(this.settings);
+    return this.settings.effectsVolume;
+  }
 
-    // Remove old listeners by cloning
-    const newPlayAgain = playAgainBtn.cloneNode(true);
-    const newBackMenu = backMenuBtn.cloneNode(true);
-    playAgainBtn.parentNode.replaceChild(newPlayAgain, playAgainBtn);
-    backMenuBtn.parentNode.replaceChild(newBackMenu, backMenuBtn);
+  /**
+   * A new bomb of the same level, in the bomb room
+   */
+  async _restartBomb() {
+    await fadeScreen(true);
+    this._resetGame();
+    this._showBombRoom();
+    this._startGame(this.currentDifficulty);
+    await fadeScreen(false);
+  }
 
-    newPlayAgain.addEventListener('click', () => {
-      overlay.style.display = 'none';
-      this._resetGame();
-      this._startGame(this.currentDifficulty);
-    });
+  _showBombRoom() {
+    this.office.setVisible(false);
+    this.bombRoom.setVisible(true);
+    this.sceneManager.setLighting(this.bombRoom.lighting);
+  }
 
-    newBackMenu.addEventListener('click', () => {
-      overlay.style.display = 'none';
-      this._resetGame();
-      this.menuUI.showMainMenu();
-    });
-
-    console.log(`[KTANE] ${won ? 'DEFUSED' : 'EXPLOSION'} — Time: ${timeUsedText}, Strikes: ${this.bombState.strikes}/${this.bombState.maxStrikes}`);
+  /**
+   * Leave the bomb room (or the report) for the office and its desk menu
+   */
+  async _backToOffice() {
+    await fadeScreen(true);
+    this._resetGame();
+    this.bombModel.getObject().visible = false;
+    this.bombRoom.setVisible(false);
+    this.office.setVisible(true);
+    this.sceneManager.setLighting(this.office.lighting);
+    this.menuUI.showMainMenu();
+    this.deskMenu.show(true);
+    await fadeScreen(false);
   }
 
   /**
@@ -339,6 +415,9 @@ class App {
     this.isGameActive = false;
     this._gameOver = false;
     this.bombState = null;
+    this.alarm = null;
+    this._gameOverToken++;
+    this.deskClock?.reset();
     this._heldPart = null;
     this._ignoreClick = false;
     this._timerSpeed = 1.0;
@@ -388,14 +467,29 @@ class App {
    * Called when a module triggers a strike
    */
   _onModuleStrike(slotId) {
-    this._onStrike();
+    const module = this.bombState.modules.find(m => m.slotId === slotId);
+    this._onStrike(MODULE_NAMES[module?.type] ?? 'A module');
   }
 
   /* ----------------------------------------------------------
      GAME START
   ---------------------------------------------------------- */
+
+  /**
+   * From the office to the bomb room: fade out, swap rooms, start, fade in
+   */
+  async _enterBombRoom(difficulty) {
+    await fadeScreen(true);
+    this._showBombRoom();
+    this._startGame(difficulty);
+    await fadeScreen(false);
+  }
+
+  /**
+   * @param {string|object} difficulty - a preset's name, or a Free Play config shaped like one
+   */
   _startGame(difficulty) {
-    const config = DIFFICULTY[difficulty];
+    const config = typeof difficulty === 'string' ? DIFFICULTY[difficulty] : difficulty;
     if (!config) return;
 
     this.currentDifficulty = difficulty;
@@ -406,12 +500,13 @@ class App {
     console.log(`[KTANE] Starting game — ${config.label}`);
     console.log(`[KTANE] Bomb state:\n${this.bombState.toString()}`);
 
-    // Switch to game screen
+    // Switch to game screen, with the bomb on the desk
     this.menuUI.showGameScreen();
+    this.bombModel.getObject().visible = true;
 
-    // Set camera to the table overview position
-    this.sceneManager.camera.position.set(0, 3.5, 3.5);
-    this.sceneManager.camera.lookAt(0, 0.5, 0);
+    // Look down at the bomb on the desk
+    const { cameraTablePosition, cameraTableLookAt } = this.bombController;
+    this.deskMenu.moveCamera(cameraTablePosition, cameraTableLookAt, true);
 
     // Place the timer, then mark active module slots based on bomb state
     this.bombModel.setTimerSlot(this.bombState.timerSlotId);
@@ -445,13 +540,21 @@ class App {
       onSolve: (slotId) => this._onModuleSolve(slotId),
       onStrike: (slotId) => this._onModuleStrike(slotId),
     });
+
+    // The Menu folder on the bomb room's desk, and its clock's alarm
+    this.deskMenu.showInGame();
+    this.alarm = new AlarmClock();
   }
 
   /* ----------------------------------------------------------
      MOUSE HANDLERS — Delegated to BombController
   ---------------------------------------------------------- */
   _onMouseDown(event) {
-    if (this._gameOver) return;
+    if (this._gameOver || this.deskMenu.isHolding()) return;
+    if (this.deskClock?.isHeld()) {
+      if (event.button === 2) this.deskClock.putDown(); // Right click puts the clock down
+      return;
+    }
     this._ignoreClick = false;
     if (this._pressModulePart(event)) return; // A held part must not drag the bomb
     this.bombController.onMouseDown(event);
@@ -503,7 +606,11 @@ class App {
    * Step back one level: leave the focused module, or put the bomb down
    */
   _deselect() {
-    if (!this.isGameActive || this._gameOver || this._heldPart) return;
+    if (!this.isGameActive || this._gameOver || this._heldPart || this.deskMenu.isHolding()) return;
+    if (this.deskClock?.isHeld()) {
+      this.deskClock.putDown();
+      return;
+    }
 
     const state = this.bombController.getState();
     if (state === BOMB_STATE.MODULE_FOCUSED) {
@@ -518,7 +625,8 @@ class App {
      CLICK HANDLER — Pick up bomb or click module slot
   ---------------------------------------------------------- */
   _onBombClick(object) {
-    if (!this.isGameActive || this._gameOver || this._ignoreClick) return;
+    if (!this.isGameActive || this._gameOver || this._ignoreClick || this.deskMenu.isHolding()) return;
+    if (this.deskClock?.isHeld()) return; // The held clock handles every click
     if (this.bombController.isAnimating()) return;
 
     const state = this.bombController.getState();
@@ -586,7 +694,7 @@ class App {
      HOVER HANDLERS — Highlight module slots and parts
   ---------------------------------------------------------- */
   _onBombHover(object) {
-    if (!this.isGameActive || this._gameOver) return;
+    if (!this.isGameActive || this._gameOver || this.deskMenu.isHolding() || this.deskClock?.isHeld()) return;
     const state = this.bombController.getState();
     const cursor = this.sceneManager.renderer.domElement.style;
 
