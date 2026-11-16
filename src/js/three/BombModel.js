@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { loadModel } from './ModelLoader.js';
 import { createTextLabel } from './TextLabel.js';
 import { drawDigit, drawStrike, timerCells } from './SevenSegment.js';
+import { mergeByMaterial } from './MergeStatic.js';
 
 // Module slot layout constants
 const SLOT_SIZE = 0.9;
@@ -67,10 +68,11 @@ export class BombModel {
       .then((model) => {
         model.traverse((child) => {
           if (child.isMesh) {
-            child.castShadow = true;
+            child.castShadow = true;    // The case alone casts the bomb's shadow: nothing else on it shows one
             child.receiveShadow = true;
           }
         });
+        mergeByMaterial(model, { byColour: true }); // It never changes, so fewer draw calls for the headset
         model.userData.interactive = true;
         model.userData.type = 'casing';
         this.group.add(model);
@@ -112,9 +114,7 @@ export class BombModel {
   _loadCover(slot) {
     loadModel('empty_slot')
       .then((cover) => {
-        cover.traverse((child) => {
-          if (child.isMesh) child.castShadow = true;
-        });
+        mergeByMaterial(cover, { byColour: true }); // A plain plate: as few draws as can be
         slot.cover = cover;
         slot.mesh.add(cover);
         this._refreshCover(slot);
@@ -244,11 +244,9 @@ export class BombModel {
 
     loadModel('timer_module')
       .then((model) => {
-        model.traverse((child) => {
-          if (child.isMesh) child.castShadow = true;
-        });
         model.getObjectByName('tm_screen').material = this._timerScreen.material;
         model.getObjectByName('tm_strike_screen').material = this._strikeScreen.material;
+        mergeByMaterial(model, { byColour: true }); // The screens have textures, so they stay separate
         this.timerGroup.add(model);
       })
       .catch((err) => console.error('[KTANE] Failed to load the timer:', err));

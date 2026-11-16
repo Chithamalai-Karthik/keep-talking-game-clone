@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { ROOM_SCALE, ROOM_OFFSET_Y } from '../three/Rooms.js';
 
 const BEAM_LENGTH = 2.5; // Metres: the pointer beam from each controller
+const FORWARD = new THREE.Vector3(0, 0, -1);
 
 // Where the player stands in each room, in game units: on the floor, facing the desk (-Z)
 export const STANDING_SPOTS = {
@@ -90,8 +91,6 @@ export class VrMode {
   _makeBeams() {
     const beams = [];
     for (const hand of ['left', 'right']) {
-      const space = this.world.player.raySpaces?.[hand];
-      if (!space) continue;
       const beam = new THREE.Mesh(
         // One metre long, from the hand forward; stretched each frame to what it hits
         new THREE.CylinderGeometry(0.0015, 0.0015, 1, 6).rotateX(Math.PI / 2).translate(0, 0, -0.5),
@@ -106,7 +105,7 @@ export class VrMode {
       beam.add(dot);
       beam.visible = false;
       beam.raycast = () => {}; // Never in the way of the rays it shows
-      space.add(beam);
+      this.world.player.add(beam); // In the rig, so in metres; placed on its hand's ray each frame
       beams.push({ hand, beam, dot });
     }
     return beams;
@@ -116,12 +115,22 @@ export class VrMode {
    * Per frame: each beam stops at the first thing its ray hits, with a dot there
    * @param {(hand: string) => THREE.Ray} rayFor - each hand's ray
    * @param {(ray: THREE.Ray) => number|null} hitDistance - how far the ray goes before it hits something, in game units
+   * @param {(hand: string) => boolean} [isTouching] - a hand touching up close shows its ball instead of a beam
    */
-  updateBeams(rayFor, hitDistance) {
+  updateBeams(rayFor, hitDistance, isTouching = () => false) {
     if (!this.active) return;
-    const scale = this.world.player.scale.x;
+    const rig = this.world.player;
+    const scale = rig.scale.x;
+    rig.updateWorldMatrix(true, false);
+    const toRig = rig.getWorldQuaternion(new THREE.Quaternion()).invert();
     for (const { hand, beam, dot } of this._beams) {
-      const distance = hitDistance(rayFor(hand));
+      beam.visible = !isTouching(hand);
+      if (!beam.visible) continue;
+      const ray = rayFor(hand);
+      // The beam lies along the hand's ray, whether that is a controller's or a tracked hand's own
+      beam.position.copy(rig.worldToLocal(ray.origin.clone()));
+      beam.quaternion.setFromUnitVectors(FORWARD, ray.direction.clone().applyQuaternion(toRig).normalize());
+      const distance = hitDistance(ray);
       const metres = distance === null ? BEAM_LENGTH : Math.min(BEAM_LENGTH, distance / scale);
       beam.scale.set(1, 1, metres);
       dot.visible = distance !== null && metres < BEAM_LENGTH;

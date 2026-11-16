@@ -18,7 +18,8 @@ export class SceneManager {
   static async create(container) {
     const world = await World.create(container, {
       // VR is ready but not offered yet: the Enter VR button comes in a later part
-      xr: { sessionMode: SessionMode.ImmersiveVR, offer: 'none' },
+      // Hand tracking where the headset has it, so the game can be played without controllers
+      xr: { sessionMode: SessionMode.ImmersiveVR, offer: 'none', features: { handTracking: true } },
       render: { fov: 50, near: 0.1, far: 100 },
       // The game reads the mouse itself (Raycaster, BombController, DeskMenu)
       input: { canvasPointerEvents: false },

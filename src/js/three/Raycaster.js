@@ -28,12 +28,18 @@ export class Raycaster {
     this._hoveredObject = null;
     this._ray = new THREE.Ray();
 
+    // Input to leave alone: a VR hand touching the bomb up close, which works by touch instead
+    this.ignore = () => false;
+
     this._unsubscribe = input.subscribe({
-      point: ({ ray }) => {
-        this._ray.copy(ray);
+      point: (event) => {
+        if (this.ignore(event)) return;
+        this._ray.copy(event.ray);
         this._updateHover();
       },
-      select: ({ ray }) => this._onSelect(ray),
+      select: (event) => {
+        if (!this.ignore(event)) this._onSelect(event.ray);
+      },
     });
   }
 

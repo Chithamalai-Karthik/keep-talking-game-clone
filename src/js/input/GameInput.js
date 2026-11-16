@@ -13,7 +13,14 @@
      back     step back (right click, Esc, B or Y button)
      rotateStart, rotate { dx, dy }, rotateEnd
               turn the held bomb with a right-drag, in drag pixels
-     grab, drop  VR grip squeezed and let go (the hand turns the bomb itself)
+     grab, drop  VR grip squeezed and let go, or a tracked hand closed and opened
+              (the hand turns the bomb itself)
+
+   Tracked hands (no controllers): the ray starts at the pinch point,
+   between thumb and index fingertips, in the headset's own steady
+   hand-ray direction; a pinch is press, release and select along it,
+   and closing the hand is grab. Each hand's pinch point and index
+   fingertip are also shared, for touching the bomb up close.
      cancel   the window lost focus: let go of anything held
    ============================================================ */
 
@@ -21,6 +28,26 @@ import * as THREE from 'three';
 
 export const DRAG_THRESHOLD = 5;        // Pixels a right press moves before it is a drag
 const LEFT_BUTTON = 0;
+
+// A tracked hand counts as closed (grabbing) when its middle, ring and little fingertips are
+// this close to the wrist on average, and open again only past the second distance, so it
+// doesn't flicker between the two (metres)
+export const HAND_CLOSED = 0.085;
+export const HAND_OPEN = 0.11;
+const CURLED_FINGERS = ['middle-finger-tip', 'ring-finger-tip', 'pinky-finger-tip'];
+const HAND_RAY_SMOOTHING = 0.5;   // Of the way to the new ray each frame: steadier aim, little lag
+const TRACKED_RECENTLY_MS = 250;  // A hand whose joints were read this recently is a hand, not a controller
+
+/**
+ * Whether a tracked hand is closed, from how far its curled fingertips are from the wrist
+ * @param {number[]} tipDistances - metres, one per fingertip
+ * @param {boolean} wasClosed - so the hand has to open clearly before it counts as open
+ */
+export function isHandClosed(tipDistances, wasClosed) {
+  if (!tipDistances.length) return false;
+  const average = tipDistances.reduce((sum, d) => sum + d, 0) / tipDistances.length;
+  return wasClosed ? average < HAND_OPEN : average < HAND_CLOSED;
+}
 const RIGHT_BUTTON = 2;
 
 /**
@@ -87,9 +114,12 @@ export class GameInput {
 
     // VR: one ray per hand; the hand that last pulled its trigger does the pointing
     this._hands = {
-      left: { ray: new THREE.Ray() },
-      right: { ray: new THREE.Ray() },
+      left: { ray: new THREE.Ray(), closed: false, queued: [], joints: null, spread: null, trackedAt: -Infinity },
+      right: { ray: new THREE.Ray(), closed: false, queued: [], joints: null, spread: null, trackedAt: -Infinity },
     };
+    this._session = null;
+    // Touch mode: { ahead, far } in world units, set by the game in the bomb room in VR; null otherwise
+    this.touchReach = null;
     this._turn = new THREE.Quaternion();
     this._activeHand = 'right';
     this._lastRay = this._mouseRay;
@@ -148,10 +178,72 @@ export class GameInput {
   }
 
   /**
+   * In touch mode, a VR hand's short ray through its droplet, or null
+   * @param {'left'|'right'} hand
+   */
+  touchRay(hand) {
+    return this.touchReach ? this._hands[hand].touchRay : null;
+  }
+
+  /**
    * Read VR controllers from an IWSDK world while it is in a VR session
    */
   attachXR(world) {
     this._world = world;
+    // Tracked hands have no gamepad: their pinches come as the session's select events,
+    // and whether they are closed comes from their joints, read each XR frame
+    world.renderer.xr.addEventListener('sessionstart', () => this._listenToHands(world.renderer.xr.getSession()));
+    world.renderer.xr.addEventListener('sessionend', () => this._listenToHands(null));
+    world.onXRFrame?.((frame) => this._readHands(frame));
+  }
+
+  _listenToHands(session) {
+    if (this._session) {
+      this._session.removeEventListener('selectstart', this._onHandPinch);
+      this._session.removeEventListener('selectend', this._onHandPinch);
+    }
+    this._session = session;
+    for (const hand of Object.values(this._hands)) {
+      hand.closed = false;
+      hand.queued.length = 0;
+      hand.joints = null;
+      hand.kind = null;
+    }
+    if (!session) return;
+    this._onHandPinch ??= (event) => {
+      const { inputSource } = event;
+      const hand = this._hands[inputSource.handedness];
+      if (!inputSource.hand || !hand || hand.closed) return; // Controllers use their gamepad; a fist isn't a pinch
+      hand.queued.push(event.type === 'selectstart' ? 'pinch' : 'unpinch');
+    };
+    session.addEventListener('selectstart', this._onHandPinch);
+    session.addEventListener('selectend', this._onHandPinch);
+  }
+
+  // Each XR frame: is each tracked hand open or closed?
+  _readHands(frame) {
+    const space = this._world.renderer.xr.getReferenceSpace();
+    if (!space) return;
+    for (const source of frame.session.inputSources) {
+      const hand = this._hands[source.handedness];
+      if (!source.hand || !hand || !frame.getJointPose) continue;
+      const at = (name) => frame.getJointPose(source.hand.get(name), space)?.transform.position ?? null;
+      const wrist = at('wrist');
+      if (!wrist) continue;
+      const distances = [];
+      for (const name of CURLED_FINGERS) {
+        const tip = at(name);
+        if (tip) distances.push(Math.hypot(wrist.x - tip.x, wrist.y - tip.y, wrist.z - tip.z));
+      }
+      hand.spread = distances.length ? distances.reduce((s, d) => s + d, 0) / distances.length : null;
+      hand.trackedAt = performance.now();
+      // For the hand's own ray (in the rig's space, in metres)
+      const thumb = at('thumb-tip'), index = at('index-finger-tip');
+      hand.joints = thumb && index ? { wrist, thumb, index } : null;
+      const closed = isHandClosed(distances, hand.closed);
+      if (closed !== hand.closed) hand.queued.push(closed ? 'close' : 'open');
+      hand.closed = closed;
+    }
   }
 
   /**
@@ -164,12 +256,43 @@ export class GameInput {
     for (const handName of ['left', 'right']) {
       const pad = pads?.[handName];
       const space = world.player.raySpaces[handName];
-      if (!pad || !space) continue;
+      if (!space) continue;
       const hand = this._hands[handName];
+      // A tracked hand, whether or not the runtime gives it a stand-in gamepad
+      const isHand = hand.joints !== null && performance.now() - hand.trackedAt < TRACKED_RECENTLY_MS;
+      // The headset's own ray direction: steady, from the shoulder through the hand
       space.getWorldPosition(hand.ray.origin);
       hand.ray.direction.set(0, 0, -1).applyQuaternion(space.getWorldQuaternion(this._turn));
-
+      if (isHand) this._placeHand(hand, world.player);
+      hand.kind = isHand ? 'hand' : pad ? 'controller' : null;
+      // Touch mode (the bomb room): every action goes along a short ray through the droplet,
+      // so only what the droplet touches is pointed at or clicked
       const event = { ray: hand.ray, source: handName };
+      if (this.touchReach) {
+        hand.touchRay ??= new THREE.Ray();
+        hand.touchRay.direction.copy(hand.ray.direction);
+        hand.touchRay.origin.copy(hand.ray.origin).addScaledVector(hand.ray.direction, this.touchReach.ahead);
+        event.ray = hand.touchRay;
+        event.far = this.touchReach.far;
+      }
+
+      // A tracked hand: its pinches and its closing and opening, queued since the last frame
+      if (isHand || !pad) {
+        const queued = hand.queued.splice(0);
+        if (queued.includes('pinch')) this._activeHand = handName;
+        if (handName === this._activeHand) this._emit('point', event);
+        for (const step of queued) {
+          if (step === 'pinch') this._emit('press', event);
+          if (step === 'unpinch') {
+            this._emit('release', event);
+            this._emit('select', event);
+          }
+          if (step === 'close') this._emit('grab', event);
+          if (step === 'open') this._emit('drop', event);
+        }
+        continue;
+      }
+
       if (pad.getSelectStart()) this._activeHand = handName;
       if (handName === this._activeHand) this._emit('point', event);
       if (pad.getSelectStart()) this._emit('press', event);
@@ -181,6 +304,44 @@ export class GameInput {
       if (pad.getButtonDown('xr-standard-squeeze')) this._emit('grab', event);
       if (pad.getButtonUp('xr-standard-squeeze')) this._emit('drop', event);
     }
+  }
+
+  // A tracked hand: its ray starts at the pinch point, and its pinch point and index fingertip
+  // are kept in world space for touching things up close (smoothed a little against jitter)
+  _placeHand(hand, rig) {
+    const { thumb, index } = hand.joints;
+    rig.updateWorldMatrix(true, false);
+    const pinch = new THREE.Vector3((thumb.x + index.x) / 2, (thumb.y + index.y) / 2, (thumb.z + index.z) / 2).applyMatrix4(rig.matrixWorld);
+    const tip = new THREE.Vector3(index.x, index.y, index.z).applyMatrix4(rig.matrixWorld);
+    if (!hand.pinchPoint) {
+      hand.pinchPoint = pinch;
+      hand.indexTip = tip;
+    } else {
+      hand.pinchPoint.lerp(pinch, HAND_RAY_SMOOTHING);
+      hand.indexTip.lerp(tip, HAND_RAY_SMOOTHING);
+    }
+    hand.ray.origin.copy(hand.pinchPoint);
+  }
+
+  /**
+   * A VR hand's pinch point (a controller's tip), index fingertip (hands only) and pointing
+   * direction, in world space, or null when it isn't tracked
+   * @param {'left'|'right'} handName
+   */
+  handPose(handName) {
+    const hand = this._hands[handName];
+    if (hand.kind === 'controller' && this._world?.session) {
+      return { pinchPoint: hand.ray.origin, indexTip: null, direction: hand.ray.direction, closed: false };
+    }
+    if (!hand.joints || !hand.pinchPoint || performance.now() - hand.trackedAt > TRACKED_RECENTLY_MS) return null;
+    return { pinchPoint: hand.pinchPoint, indexTip: hand.indexTip, direction: hand.ray.direction, closed: hand.closed };
+  }
+
+  /**
+   * For checking on a headset: how far each tracked hand's curled fingertips are from its wrist
+   */
+  handSpread() {
+    return { left: this._hands.left.spread, right: this._hands.right.spread };
   }
 
   // The mouse's ray: from the camera through the cursor

@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { loadModel } from './ModelLoader.js';
+import { mergeByMaterial } from './MergeStatic.js';
 
 export const ROOM_SCALE = 8;
 const DESK_HEIGHT = 0.75;     // Metres, in office.blend
@@ -41,6 +42,7 @@ export class Room {
     this.group.position.y = ROOM_OFFSET_Y;
     addLights(this.group);
     this._clock = null;
+    this.surfaces = [];
   }
 
   async load() {
@@ -52,6 +54,13 @@ export class Room {
     });
     const screen = model.getObjectByName('br_clock_screen');
     if (screen) this._clock = makeClock(screen);
+    // A room never changes, apart from the desk clock, which can be picked up: merge the rest
+    const clock = model.getObjectByName('br_clock_root');
+    mergeByMaterial(model, { byColour: true, keep: (mesh) => isInside(mesh, clock) });
+    // The surfaces a VR beam stops at: the desk tops and floor, a few simple boxes (merging
+    // made the rest a few large meshes, too slow to test a ray against every frame)
+    this.surfaces = [];
+    model.traverse((child) => { if (child.isMesh && child.receiveShadow) this.surfaces.push(child); });
     this.group.add(model);
   }
 
@@ -131,4 +140,11 @@ export function createBombRoom() {
       group.add(ceiling);
     },
   });
+}
+
+function isInside(object, ancestor) {
+  for (let node = object; node; node = node.parent) {
+    if (node === ancestor) return true;
+  }
+  return false;
 }

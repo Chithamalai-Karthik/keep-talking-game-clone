@@ -20,6 +20,7 @@
 
 import * as THREE from 'three';
 import { loadModel } from '../three/ModelLoader.js';
+import { mergeByMaterial } from '../three/MergeStatic.js';
 
 const STATUS_SOLVED_COLOR = 0x2ecc71;
 const STATUS_STRIKE_COLOR = 0xe94560;
@@ -78,13 +79,41 @@ export class ModuleBase {
 
     this._prepareStatusLight(housing);
     this._prepareParts(body);
-    this.build(body);
+    const lookedUp = this._buildRecordingLookups(body);
 
+    // For fewer draw calls in VR, merge what never changes, one mesh per material: the housing
+    // apart from its status light, and the body's decoration. Whatever the module looked up while
+    // building, its parts, and anything it added are left as they are, since those can change.
+    // Modules cast no shadows: nothing on the bomb's face receives one, and the case shadows the desk.
+    mergeByMaterial(housing, { byColour: true, keep: (mesh) => mesh === this._statusLight });
+    mergeByMaterial(body, { byColour: true, only: lookedUp.original, keep: (mesh) => isInsideAny(mesh, lookedUp.kept, body) });
     this.root.add(housing, body);
-    this.root.traverse((child) => {
-      if (child.isMesh && !child.material.transparent) child.castShadow = true;
-    });
     this.slotMesh.add(this.root);
+  }
+
+  /**
+   * Build the module, noting every object it looks up by name, and the model's own meshes
+   * @returns {{ kept: Set<THREE.Object3D>, original: Set<THREE.Object3D> }}
+   */
+  _buildRecordingLookups(body) {
+    const original = new Set();
+    body.traverse((child) => { if (child.isMesh) original.add(child); });
+    const kept = new Set();
+    body.traverse((child) => {
+      if (child.userData?.type === 'modulePart' || child.name.startsWith('part_')) kept.add(child);
+    });
+    const lookup = body.getObjectByName;
+    body.getObjectByName = (name) => {
+      const found = lookup.call(body, name);
+      if (found) kept.add(found);
+      return found;
+    };
+    try {
+      this.build(body);
+    } finally {
+      delete body.getObjectByName; // Back to the shared method
+    }
+    return { kept, original };
   }
 
   setup() {}
@@ -249,4 +278,14 @@ export class ModuleBase {
     this._disposables = [];
     this.parts.clear();
   }
+}
+
+/**
+ * Whether an object is one of a set, or inside one of them, below a root
+ */
+function isInsideAny(object, set, root) {
+  for (let node = object; node && node !== root.parent; node = node.parent) {
+    if (set.has(node)) return true;
+  }
+  return false;
 }

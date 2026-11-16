@@ -10,6 +10,7 @@ import { BombModel, BOMB_HALF_SIZE } from './three/BombModel.js';
 import { createOffice, createBombRoom } from './three/Rooms.js';
 import { DeskMenu, MENU_CAMERA } from './menu/DeskMenu.js';
 import { VrMode } from './xr/VrMode.js';
+import { HandTouch, isWirePart, Contact, TOUCH } from './xr/HandTouch.js';
 import { BombController, BOMB_STATE } from './three/BombController.js';
 import { Raycaster } from './three/Raycaster.js';
 import { GameInput } from './input/GameInput.js';
@@ -43,6 +44,7 @@ import './game/KnobModule.js';
 const FADE_MS = 350;
 const VR_CLOCK_DISTANCE = 3.6;   // Game units: about 45 cm from the eyes
 const VR_REACH = 0.8;            // Game units: a hand within about 10 cm of something can grab it
+const TOUCH_PRESS_DEPTH = 0.012; // A part pinched by a VR hand sinks this far into its module while held
 
 // The bomb room's desk, in game units: where dropped things can land in VR
 const BOMB_DESK = {
@@ -93,6 +95,9 @@ class App {
     this.deskClock = null;           // The clock itself, which can be picked up
     this._grabHand = null;           // VR: 'left' or 'right' while that hand grips the bomb
     this._clockHand = null;          // VR: the hand gripping the desk clock
+    this._touchPress = { left: null, right: null }; // VR hands: the part each is pinching
+    this._touchParts = [];
+    this._touchPartsAge = 0;
     this._grabVelocity = null;       // VR: how the grabbed bomb is moving, for when it is let go
     this._lastGrabPosition = null;
     this._beamRaycaster = null;
@@ -167,7 +172,10 @@ class App {
       // Holding module parts, turning the bomb, stepping back, and the desk clock
       this.input.subscribe({
         press: (e) => this._onPress(e),
-        release: () => this._releaseHeldPart(),
+        release: (e) => {
+          if (this._touchPress[e.source]) this._releaseTouched(e.source);
+          else this._releaseHeldPart();
+        },
         rotateStart: () => {
           if (!this._gameOver && !this.deskMenu.isHolding() && !this.deskClock?.isHeld()) this.bombController.rotateStart();
         },
@@ -250,6 +258,10 @@ class App {
       this.deskMenu.show(true);
       loader.track(this.deskMenu.load()).catch(err => console.error('[KTANE] Menu model failed to load:', err));
 
+      // VR in the bomb room: a droplet to touch parts with, and a pinch or the trigger to use them
+      this.handTouch = new HandTouch(this.sceneManager.scene);
+      this.raycaster.ignore = () => this._touchMode();
+
       // VR: the Enter VR button where it is supported, and the player's place in each room
       this.vrMode = new VrMode(this.sceneManager, {
         onEnter: () => this.deskMenu.setVR(true),
@@ -281,7 +293,11 @@ class App {
     this.bombRoom.update(this.alarm?.displayOn ?? true);
     this.deskClock?.update(delta);
     this._followHand(delta);
-    if (this.vrMode.active) this.vrMode.updateBeams((hand) => this.input.handRay(hand), (ray) => this._beamHit(ray));
+    this._updateHandTouch();
+    if (this.vrMode.active) {
+      const touching = this._touchMode(); // No beams in the bomb room: the droplets instead
+      this.vrMode.updateBeams((hand) => this.input.handRay(hand), (ray) => this._beamHit(ray), () => touching);
+    }
     if (!this.isGameActive) return;
 
     this.bombController.update(delta);
@@ -429,6 +445,123 @@ class App {
     );
   }
 
+  // VR in the bomb room is touch mode: droplets instead of beams, for hands and controllers
+  _touchMode() {
+    return Boolean(this.vrMode?.active && this.bombRoom.getObject().visible);
+  }
+
+  // Touch mode, per frame: place the droplets, find what each touches, and poke the clock's snooze bar
+  _updateHandTouch() {
+    const scale = this.sceneManager.world.player.scale.x;
+    if (!this._touchMode()) {
+      this.input.touchReach = null;
+      if (this._touchOn) this._resetTouch();
+      this._touchOn = false;
+      return;
+    }
+    this._touchOn = true;
+    // Actions go along a short ray through each droplet, from its round end to just past its tip
+    this.input.touchReach = { ahead: (TOUCH.tipAhead - TOUCH.dropLength) * scale, far: (TOUCH.dropLength + TOUCH.touchGap) * scale };
+
+    const bomb = this.bombModel.getObject();
+    const bombLive = this.isGameActive && !this._gameOver && bomb.visible;
+    if (!bombLive) this._touchParts = [];
+    else if (--this._touchPartsAge <= 0) this._collectTouchParts();
+    this._touchBomb ??= new THREE.Sphere(new THREE.Vector3(), Math.hypot(BOMB_HALF_SIZE.x, BOMB_HALF_SIZE.y, BOMB_HALF_SIZE.z));
+    bomb.getWorldPosition(this._touchBomb.center);
+    const poses = { left: this.input.handPose('left'), right: this.input.handPose('right') };
+    const busy = { left: this._grabHand === 'left' || this._clockHand === 'left', right: this._grabHand === 'right' || this._clockHand === 'right' };
+    this.handTouch.update({
+      poses,
+      busy,
+      bomb: bombLive ? this._touchBomb : null,
+      parts: this._touchParts,
+      scale,
+      touchingOther: { left: this._tipTouches('left'), right: this._tipTouches('right') },
+    });
+    this._pokeSnooze(poses, busy, scale);
+  }
+
+  // Whether a droplet touches the folder or the clock (the bomb's parts are found by HandTouch)
+  _tipTouches(hand) {
+    const ray = this.input.touchRay(hand);
+    if (!ray) return false;
+    this._tipRaycaster ??= new THREE.Raycaster();
+    this._tipRaycaster.ray.copy(ray);
+    this._tipRaycaster.far = this.input.touchReach.far;
+    const targets = this.deskMenu.group.visible ? this.deskMenu.group.children.filter(prop => prop.visible) : [];
+    if (this.deskClock?.root.visible) targets.push(this.deskClock.root);
+    return this._tipRaycaster.intersectObjects(targets, true).some(hit => isShown(hit.object));
+  }
+
+  // A tracked hand's index fingertip pressing into the clock's snooze bar snoozes it (the bar is big enough to poke)
+  _pokeSnooze(poses, busy, scale) {
+    const clock = this.deskClock;
+    this._snoozePokes ??= { left: new Contact(TOUCH.pokePress, TOUCH.pokeRelease), right: new Contact(TOUCH.pokePress, TOUCH.pokeRelease) };
+    for (const hand of ['left', 'right']) {
+      const tip = poses[hand]?.indexTip;
+      const poke = this._snoozePokes[hand];
+      if (!tip || busy[hand] || !clock?.root.visible || !this.isGameActive || this._gameOver) {
+        poke.reset();
+        continue;
+      }
+      this._snoozeBox ??= new THREE.Box3();
+      this._snoozeBox.setFromObject(clock.snooze);
+      if (poke.update(this._snoozeBox.distanceToPoint(tip) / scale) === 'start') this._snoozeClock();
+    }
+  }
+
+  _snoozeClock() {
+    this.deskClock.pressSnooze();
+    this.alarm?.snooze();
+    playSound('press');
+  }
+
+  // The bomb's clickable parts that are showing, gathered again now and then as modules change
+  _collectTouchParts() {
+    this._touchPartsAge = 30;
+    const parts = [];
+    this.bombModel.getObject().traverse((object) => {
+      const data = object.userData;
+      if (data?.type === 'modulePart' && this.bombModel.isSlotActive(data.slotId)) {
+        parts.push({ object, slotId: data.slotId, partId: data.partId });
+      }
+    });
+    this._touchParts = parts;
+  }
+
+  // Pinch a touched part: held (The Button, the Capacitor lever) or used when let go, like a mouse
+  // click. A button that is used when let go stays down while pinched, so the press can be seen.
+  _pressTouched(hand, part) {
+    if (this._touchPress[hand]) return;
+    const held = this.moduleManager?.handlePartPress(part.slotId, part.partId) ?? false;
+    const press = { part, held, restZ: null };
+    if (!held && !isWirePart(part.partId)) {
+      press.restZ = part.object.position.z;
+      part.object.position.z -= TOUCH_PRESS_DEPTH;
+    }
+    this._touchPress[hand] = press;
+  }
+
+  _releaseTouched(hand) {
+    const press = this._touchPress[hand];
+    this._touchPress[hand] = null;
+    if (press && press.restZ !== null) press.part.object.position.z = press.restZ; // Up again, before the module's own press
+    if (!press || this._gameOver || !this.moduleManager) return;
+    if (press.held) this.moduleManager.handlePartRelease(press.part.slotId, press.part.partId);
+    else this.moduleManager.handlePartClick(press.part.slotId, press.part.partId);
+  }
+
+  _resetTouch() {
+    for (const press of Object.values(this._touchPress)) {
+      if (press && press.restZ !== null) press.part.object.position.z = press.restZ;
+    }
+    this.handTouch.reset();
+    this._touchParts = [];
+    this._touchPartsAge = 0;
+    this._touchPress = { left: null, right: null };
+  }
+
   /**
    * VR: letting go of the grip drops what that hand holds
    */
@@ -465,8 +598,16 @@ class App {
   _beamHit(ray) {
     this._beamRaycaster ??= new THREE.Raycaster();
     this._beamRaycaster.ray.copy(ray);
-    const targets = [this.bombModel.getObject(), this.deskMenu.group, this.office.getObject(), this.bombRoom.getObject()];
-    if (this.deskClock && this.deskClock.root.parent?.isScene) targets.push(this.deskClock.root);
+    const bomb = this.bombModel.getObject();
+    // The bomb's hundreds of parts are only checked when the beam passes near the bomb at all
+    this._bombSphere ??= new THREE.Sphere(new THREE.Vector3(), Math.hypot(BOMB_HALF_SIZE.x, BOMB_HALF_SIZE.y, BOMB_HALF_SIZE.z));
+    bomb.getWorldPosition(this._bombSphere.center);
+    const nearBomb = bomb.visible && ray.intersectsSphere(this._bombSphere);
+    // Only what a beam should stop at, and only what is showing
+    const room = this.bombRoom.getObject().visible ? this.bombRoom : this.office;
+    const targets = [...room.surfaces, ...this.deskMenu.group.children.filter(prop => prop.visible)];
+    if (nearBomb) targets.push(bomb);
+    if (this.deskClock && this.bombRoom.getObject().visible) targets.push(this.deskClock.root);
     for (const hit of this._beamRaycaster.intersectObjects(targets, true)) {
       if (isShown(hit.object)) return hit.distance;
     }
@@ -476,16 +617,12 @@ class App {
   /**
    * The desk clock: pick it up (putting the bomb down first), or press snooze while it is held
    */
-  _onClockClick({ ray }) {
+  _onClockClick({ ray, far }) {
     const clock = this.deskClock;
     if (!clock || !this.isGameActive || this._gameOver || this.deskMenu.isHolding() || clock.isMoving()) return;
-    // VR: the trigger on the snooze bar presses it, whether the clock is on the desk or in a hand
+    // VR: the trigger or a pinch with the droplet on the snooze bar presses it, on the desk or in a hand
     if (this.vrMode.active) {
-      if (clock.isSnoozeAt(ray)) {
-        clock.pressSnooze();
-        this.alarm?.snooze();
-        playSound('press');
-      }
+      if (clock.isSnoozeAt(ray, far)) this._snoozeClock();
       return;
     }
     if (clock.isHeld()) {
@@ -587,6 +724,7 @@ class App {
     this.alarm = null;
     this._grabHand = null;
     this._clockHand = null;
+    this._resetTouch?.();
     this._gameOverToken++;
     this.deskClock?.reset();
     this._heldPart = null;
@@ -723,8 +861,13 @@ class App {
   /**
    * The primary button went down (left button or trigger): maybe on a part to hold
    */
-  _onPress({ ray }) {
+  _onPress({ ray, source }) {
     if (this._gameOver || this.deskMenu.isHolding() || this.deskClock?.isHeld()) return;
+    if (this._touchMode()) {
+      const part = this.handTouch.touched(source);
+      if (part) this._pressTouched(source, part);
+      return;
+    }
     this._ignoreClick = false;
     this._pressModulePart(ray);
   }

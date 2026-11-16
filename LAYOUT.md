@@ -29,13 +29,14 @@ with a comment saying what it does. ROADMAP.md says what is built and what comes
 
 | File | What it does |
 | --- | --- |
-| `GameInput.js` | the mouse and VR controllers as game actions (point, press, release, select, back, rotate, grab, drop), each with a ray; everything that reacts to input listens here |
+| `GameInput.js` | the mouse, VR controllers and tracked hands as game actions (point, press, release, select, back, rotate, grab, drop), each with a ray; a pinch is press, a closed hand is grab; everything that reacts to input listens here |
 
 ## `src/js/xr/`
 
 | File | What it does |
 | --- | --- |
 | `VrMode.js` | entering and leaving VR: the Enter VR button where VR is supported, the player standing at real size at each room's desk, where held props go, and the controllers' beams that stop at what they hit |
+| `HandTouch.js` | VR in the bomb room: the droplet pointer in front of each hand or controller, which bomb part its tip touches (by the part's real shape), that part's red outline, and the poke contact for the clock's snooze bar |
 
 ## `src/js/menu/`
 
@@ -65,6 +66,7 @@ The Expert manual, a page of its own that never sees a live bomb.
 | `BombController.js` | bomb states and animation: pick up, put down, turning by hand (from GameInput's rotate actions), focus a module, and in VR held in a hand and dropped |
 | `Raycaster.js` | hover and clicks on the bomb, along GameInput's ray |
 | `ModelLoader.js` | loads and caches `.glb` models exported from Blender, and textures |
+| `MergeStatic.js` | fewer draw calls: bakes pieces that never change into one mesh, by material or by colour |
 | `Drop.js` | something let go of in VR falling to the desk: landing where it comes down (a box on the face nearest down), or going back to its place if it misses |
 | `SevenSegment.js` | seven-segment digits and strike marks, drawn for the timer's two screens |
 | `DeskClock.js` | the bomb room's alarm clock as an object: picking it up (on screen) or grabbing and dropping it (in VR), its SNOOZE bar, pressing it and putting it down |
@@ -76,7 +78,7 @@ The Expert manual, a page of its own that never sees a live bomb.
 | File | What it does |
 | --- | --- |
 | `BombState.js` | one bomb's random setup and rules state: serial, batteries, indicators, ports, modules, strikes |
-| `ModuleBase.js` | base class for 3D modules: lifecycle, housing, status light, clickable `part_` objects, solve and strike |
+| `ModuleBase.js` | base class for 3D modules: lifecycle, housing, status light, clickable `part_` objects, solve and strike, and merging what a module never changes |
 | `ModuleManager.js` | module type registry; creates a module per slot and routes part clicks and hover to it |
 | `WiresModule.js` | the Wires module on the bomb: wire colours and cutting |
 | `ButtonModule.js` | The Button on the bomb: colour, label, press and hold, the strip light and the clear cover |
@@ -171,7 +173,8 @@ Module rules with no 3D code, so they can be tested without a renderer.
 | `Drop.test.js` | VR drops: landing where it falls, the hand's motion, landing on the nearest face, and going back when it misses |
 | `SevenSegment.test.js` | the timer's digit segments, and laying out minutes or seconds as four digits |
 | `Loader.test.js` | where the loader's spark is: following finished loads, never ahead of the minimum time |
-| `GameInput.test.js` | mouse buttons and movement as actions: press, release, a right click as back, a right-drag as a turn |
+| `GameInput.test.js` | mouse buttons and movement as actions: press, release, a right click as back, a right-drag as a turn; when a tracked hand counts as closed |
+| `HandTouch.test.js` | the droplet pointer's shape, poking the snooze bar without repeats, and which parts are wires (which don't sink when pinched) |
 | `MenuPages.test.js` | the binder's levels, their facts and briefs, the results report, the menu sheets' choices, volume steps, and finding the clicked line on a page |
 | `Sounds.test.js` | sounds stay safe without browser audio, and every Simon Says colour has a tone |
 

@@ -244,17 +244,18 @@ export class DeskClock {
   /**
    * Whether a ray (the mouse's or a VR controller's) is on the clock, or only on its snooze bar
    */
-  isAt(ray) {
-    return this._hit(ray, this._parts);
+  isAt(ray, far = Infinity) {
+    return this._hit(ray, this._parts, far);
   }
 
-  isSnoozeAt(ray) {
-    return this._hit(ray, [this.snooze, this.snooze.getObjectByName('br_clock_snooze_label')]);
+  isSnoozeAt(ray, far = Infinity) {
+    return this._hit(ray, [this.snooze, this.snooze.getObjectByName('br_clock_snooze_label')], far);
   }
 
-  _hit(ray, objects) {
+  _hit(ray, objects, far) {
     if (!this.root.visible || !this.home.visible) return false;
     this._raycaster.ray.copy(ray);
+    this._raycaster.far = far;
     return this._raycaster.intersectObjects(objects.filter(Boolean), false).length > 0;
   }
 }

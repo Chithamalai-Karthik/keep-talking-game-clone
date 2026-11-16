@@ -3,7 +3,7 @@
    ============================================================ */
 
 import { describe, it, expect } from 'vitest';
-import { MouseActions, DRAG_THRESHOLD } from '../src/js/input/GameInput.js';
+import { MouseActions, DRAG_THRESHOLD, isHandClosed, HAND_CLOSED, HAND_OPEN } from '../src/js/input/GameInput.js';
 
 const LEFT = 0;
 const RIGHT = 2;
@@ -59,5 +59,23 @@ describe('Mouse actions', () => {
     mouse.cancel();
     mouse.up(RIGHT);
     expect(actions).toEqual([['rotateStart'], ['rotate', { dx: 50, dy: 0 }], ['rotateEnd'], ['cancel']]);
+  });
+});
+
+describe('Tracked hand closing', () => {
+  it('counts a hand as closed when its fingertips curl in to the wrist', () => {
+    expect(isHandClosed([0.07, 0.07, 0.07], false)).toBe(true);
+    expect(isHandClosed([0.15, 0.16, 0.14], false)).toBe(false);
+  });
+
+  it('needs a clear opening before a closed hand counts as open, so it does not flicker', () => {
+    const between = (HAND_CLOSED + HAND_OPEN) / 2;
+    expect(isHandClosed([between, between, between], false)).toBe(false);
+    expect(isHandClosed([between, between, between], true)).toBe(true);
+    expect(isHandClosed([HAND_OPEN + 0.01, HAND_OPEN + 0.01, HAND_OPEN + 0.01], true)).toBe(false);
+  });
+
+  it('is open when no fingertips are tracked', () => {
+    expect(isHandClosed([], true)).toBe(false);
   });
 });

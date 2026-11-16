@@ -193,7 +193,7 @@ Step 46 is built in parts:
 | 46f | Use every module with controllers and hands, including held parts, wires, dials and small buttons. | L | 2027-05-01 | In progress |
 | 46g | A new menu matching the original game's, shared by the browser and VR, with difficulty, hints and game over. | L | 2027-05-08 | Done 2026-11-13 |
 | 46h | Sound placed in the room, and vibration on presses and strikes. | S | 2027-05-09 | Not started |
-| 46i | Headset performance: frame rate, shadows and sharp text. | M | 2027-05-16 | Not started |
+| 46i | Headset performance: frame rate, shadows and sharp text. | M | 2027-05-16 | In progress |
 | 46j | A full play test on the headset, with an Expert in the same room. | S | 2027-05-22 | Not started |
 
 Decisions for Phase G:
@@ -222,7 +222,18 @@ Decisions for Phase G:
   - Hover on the desk props' pages is a highlight shape over the page (a highlighter-yellow fill, or a frame round dark buttons), not a redraw of the page: measured on the headset, each redraw cost about two frames in the bomb room, which showed as flicker, and the highlight costs none.
   - The levels get the highlight, and a level's page has BACK and START stamps (the user's request).
   - Testing from the laptop: `metavr capture screenshot` for the headset's view, and remote debugging of the Quest browser (`adb forward tcp:9222 localabstract:chrome_devtools_remote`) to read the game's state and measure frame times. The dev server listens on 127.0.0.1, which `adb reverse` reaches.
-- Still to do in 46e and 46f: hand tracking (no controllers), and checking every module's small parts with the beam.
+- Hand tracking (2026-11-16), tried by the user on the headset:
+  - A pinch is press and click, and closing the hand is grab, with the same 10 cm reach as the grip. The beam starts at the pinch point and keeps the system's hand direction: one worked out from the wrist and knuckle pointed upward and shook (the user's finding).
+  - In the office, hands keep the beam and pinch (the user's decision).
+  - Near the bomb (about 25 cm), each free hand gets a droplet in front of its pinch, its tip pointing the way the hand points (the user's request, after a round ball): its tip touching a part turns it red and outlines the part in red, after the original's VR. A pinch then uses that part, for wires and buttons alike.
+  - No poking the bomb (the user's decision): the buttons are smaller than a fingertip, so pokes pressed the wrong ones, and nothing showed the press. Instead a pinched button stays down until the pinch lets go. The clock's big snooze bar can be poked (the user's decision).
+  - No beams in the bomb room, for hands and controllers alike (the user's decision): both get the droplet, everywhere in the room. The folder and the clock work by touching them with the droplet's tip (a short ray through the droplet), then pinch or trigger. The office keeps beams.
+- Still to do in 46e and 46f: checking every module's small parts with the droplet.
+- Part 46i, first pass (2026-11-16), measured on the Quest 3S with an Expert bomb in the bomb room. Each frame has 11.1 ms at 90 fps; handing the scene to the graphics chip took about 5 ms for about 335 draw calls, so the number of separate meshes is what limits it.
+  - Only the bomb's case casts shadows now (502 casters before): nothing on the bomb's face receives shadows, and the case makes the shadow on the desk. Screenshots before and after match. This halved the slow frames, from 20% to about 11-13%.
+  - Pieces that never change are merged (`MergeStatic.js`): module housings apart from the status light, empty-slot covers, the case, the timer, the rooms, and each module's decoration. A module keeps separate everything it looks up by name while building, its parts, anything it adds, hidden pieces and pieces with children; every moving piece was checked by operating it. Plain colours are merged too, with the colour on the vertices. The Expert bomb went from 596 meshes to about 300, but the slow frames hardly changed, since nearly all that is left are pieces the game changes.
+  - Merged rooms are slow to raycast, so the VR beams only test the bomb when near it, the props showing, the clock, and the room's desk tops and floor.
+  - Paused at the user's choice (2026-11-16), to return after hands and sound. Next: draw rows of lights as one mesh with per-light colours, and each module's text labels on one shared texture, about two days.
 - Check VR directly on the headset connected to the laptop (2026-11-02, the user's way of working): the user's TCS CSR Family Day VR project already does this. It uses the `iwsdk-runtime`, `iwsdk-reference` and `metavr` MCP servers in `.mcp.json`, adb over USB with `adb reverse tcp:8081 tcp:8081`, and `runtime pair-headset`. Copy that setup from its `AGENTS.md` and `DESIGN.md`. The agent checks in the headset, then the user reviews.
 
 ## Phase E: voice chat and rooms

@@ -475,6 +475,7 @@ export class DeskMenu {
   // What an input action's ray passes through, nearest first
   _hits(event, objects) {
     this._raycaster.ray.copy(event.ray);
+    this._raycaster.far = event.far ?? Infinity; // VR in the bomb room: only as far as the droplet's tip
     return this._raycaster.intersectObjects(objects, true);
   }
 
