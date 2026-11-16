@@ -17,6 +17,9 @@ const SLOT_GAP = 0.1;
 const BODY_WIDTH = 3.2;   // X axis (horizontal)
 const BODY_HEIGHT = 2.2;  // Y axis (vertical when standing)
 const BODY_DEPTH = 0.9;   // Z axis (thickness, front-to-back)
+
+/** Half the bomb's size along its own axes, for landing and reaching it in VR */
+export const BOMB_HALF_SIZE = Object.freeze({ x: BODY_WIDTH / 2, y: BODY_HEIGHT / 2, z: BODY_DEPTH / 2 });
 // Blender widget node for each port type
 const PORT_MODELS = {
   'DVI-D': 'port_dvi_d',

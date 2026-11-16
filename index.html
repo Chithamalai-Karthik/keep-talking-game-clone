@@ -12,6 +12,39 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;500;600;700;800;900&family=Special+Elite&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
+    <!-- The loader's look, inline so it shows at once -->
+    <style>
+      #loader {
+        position: fixed; inset: 0; z-index: 2000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #0b0b10; transition: background-color 0.6s ease 0.25s;
+      }
+      #loader svg { width: min(46vw, 320px); overflow: visible; }
+      #loader .loader-text {
+        margin-top: 18px; color: #b9b2a0; letter-spacing: 0.25em; font-size: 14px;
+        font-family: 'Special Elite', 'Courier New', monospace; transition: opacity 0.2s ease;
+      }
+      #loader .bomb { transform-origin: 120px 150px; transition: transform 0.35s cubic-bezier(.2,1.6,.4,1), opacity 0.3s ease 0.15s; }
+      #loader .spark { filter: drop-shadow(0 0 6px #ffb340) drop-shadow(0 0 14px #ff6a00); }
+      #loader .spark-glow { transform-box: fill-box; transform-origin: center; animation: loader-flicker 0.12s infinite alternate; }
+      #loader .flash {
+        position: fixed; left: 50%; top: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%;
+        background: radial-gradient(circle, #fffbe6 0%, #ffd36a 30%, #ff7a1a 55%, rgba(255, 80, 0, 0) 72%);
+        transform: scale(0); opacity: 0; pointer-events: none;
+      }
+      #loader.blast .bomb { transform: scale(1.35); opacity: 0; }
+      #loader.blast .spark, #loader.blast .fuse, #loader.blast .loader-text { visibility: hidden; }
+      #loader.blast .flash { animation: loader-flash 0.9s ease-out forwards; }
+      #loader.blast { background-color: rgba(11, 11, 16, 0); }
+      #loader.gone { display: none; }
+      @keyframes loader-flicker { from { transform: scale(0.85); opacity: 0.85; } to { transform: scale(1.15); opacity: 1; } }
+      @keyframes loader-flash {
+        0% { transform: scale(0); opacity: 1; }
+        35% { transform: scale(60); opacity: 1; }
+        100% { transform: scale(90); opacity: 0; }
+      }
+    </style>
+
     <!-- Stylesheets -->
     <link rel="stylesheet" href="/src/css/index.css" />
     <link rel="stylesheet" href="/src/css/animations.css" />
@@ -19,6 +52,27 @@
     <link rel="stylesheet" href="/src/css/game.css" />
   </head>
   <body>
+    <!-- Loader: a spark burns down the fuse while the 3D scene loads, then the bomb blasts away -->
+    <div id="loader" role="status" aria-label="Loading">
+      <svg viewBox="0 0 300 220" aria-hidden="true">
+        <g class="bomb">
+          <circle cx="120" cy="150" r="58" fill="#24262b" />
+          <circle cx="98" cy="128" r="14" fill="#3a3d44" />
+          <rect x="128" y="80" width="30" height="22" rx="4" transform="rotate(35 143 91)" fill="#4a4d55" />
+        </g>
+        <path class="fuse" d="M150 84 C 172 52, 205 70, 222 50 S 262 22, 282 34"
+              fill="none" stroke="#c9b48a" stroke-width="5" stroke-linecap="round" />
+        <g class="spark" transform="translate(282 34)">
+          <g class="spark-glow">
+            <circle r="7" fill="#fff4c2" />
+            <circle r="3.5" fill="#ffffff" />
+          </g>
+        </g>
+      </svg>
+      <div class="loader-text">LOADING</div>
+      <div class="flash"></div>
+    </div>
+
     <!-- Three.js Canvas Container -->
     <div id="canvas-container"></div>
 
@@ -39,6 +93,12 @@
       <div class="module-overlay-container" id="module-overlay-container"></div>
 
     </div>
+
+    <!-- Enter VR: shown only where the browser can run VR, on the menu and during a game -->
+    <button id="vr-button" class="vr-button" type="button" hidden>
+      <svg viewBox="0 0 32 20" aria-hidden="true"><path d="M3 2h26a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-7l-3-4h-6l-3 4H3a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9.5" cy="8.5" r="2.5" fill="currentColor"/><circle cx="22.5" cy="8.5" r="2.5" fill="currentColor"/></svg>
+      <span>Enter VR</span>
+    </button>
 
     <!-- Black cover for fading between the office and the bomb room -->
     <div id="screen-fade"></div>

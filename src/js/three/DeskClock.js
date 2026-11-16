@@ -6,6 +6,7 @@
    ============================================================ */
 
 import * as THREE from 'three';
+import { Drop } from './Drop.js';
 
 const MOVE_TIME = 0.4;          // Seconds to lift or put down
 const HOLD_DISTANCE = 2.2;      // Game units in front of the camera
@@ -19,12 +20,10 @@ export class DeskClock {
   /**
    * @param {THREE.Object3D} root - br_clock_root from bomb_room.glb
    * @param {THREE.PerspectiveCamera} camera
-   * @param {HTMLCanvasElement} canvas
    */
-  constructor(root, camera, canvas) {
+  constructor(root, camera) {
     this.root = root;
     this.camera = camera;
-    this.canvas = canvas;
     this.home = root.parent;            // The room it sits in
     this.snooze = root.getObjectByName('br_clock_snooze');
     this._snoozeRest = this.snooze.position.y; // glTF is y-up
@@ -40,6 +39,84 @@ export class DeskClock {
     this._press = 0;
     this._raycaster = new THREE.Raycaster();
     this._label(root.getObjectByName('br_clock_snooze_label'));
+
+    // VR: held in a hand, then dropped
+    this._grip = null;
+    this._gripOffset = new THREE.Matrix4();
+    this._drop = null;
+    this._dropping = false;
+    this._lastPosition = new THREE.Vector3();
+    this._velocity = new THREE.Vector3();
+  }
+
+  /**
+   * Where the clock can land when dropped in VR, in game units
+   */
+  setDropArea({ restY, bounds, floorY }) {
+    this.home.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, false);
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    this.root.matrixWorld.decompose(position, quaternion, new THREE.Vector3());
+    this._drop = new Drop({ restY, bounds, floorY, flat: new THREE.Quaternion(), home: { position, quaternion } });
+  }
+
+  /**
+   * VR: take the clock into a hand, keeping how it sits relative to the hand
+   */
+  grab(grip) {
+    if (this._grip || this.isHeld() || this.isMoving()) return false;
+    this._intoScene();
+    grip.updateWorldMatrix(true, false);
+    this.root.updateWorldMatrix(true, false);
+    this._gripOffset.copy(grip.matrixWorld).invert().multiply(this.root.matrixWorld);
+    this._grip = grip;
+    this._dropping = false;
+    this._lastPosition.copy(this.root.position);
+    this._velocity.set(0, 0, 0);
+    return true;
+  }
+
+  isGrabbed() {
+    return Boolean(this._grip);
+  }
+
+  /**
+   * VR: let go; it falls with the hand's motion, back to the desk
+   */
+  release() {
+    if (!this._grip) return;
+    this._grip = null;
+    if (!this._drop) {
+      this.reset();
+      return;
+    }
+    this._drop.start(this.root.position, this.root.quaternion, this._velocity);
+    this._dropping = true;
+  }
+
+  // Out of the room and into the scene itself, so it moves in world space
+  _intoScene() {
+    let scene = this.home;
+    while (scene.parent) scene = scene.parent;
+    if (this.root.parent !== scene) scene.attach(this.root);
+  }
+
+  /**
+   * How far a point (a VR hand) is from the clock, in game units: 0 when touching it
+   */
+  gapTo(point) {
+    if (!this.root.visible || !this.home.visible) return Infinity;
+    return new THREE.Box3().setFromObject(this.root).distanceToPoint(point);
+  }
+
+  /**
+   * How far along a ray the clock is, or null if the ray misses it
+   */
+  hitDistance(ray) {
+    if (!this.root.visible || !this.home.visible) return null;
+    this._raycaster.ray.copy(ray);
+    return this._raycaster.intersectObjects(this._parts, false)[0]?.distance ?? null;
   }
 
   // SNOOZE printed on the bar's top
@@ -80,22 +157,20 @@ export class DeskClock {
   /**
    * Lift the clock in front of a view. The view is where the camera will be,
    * which is the table view even when the bomb is still on its way down.
-   * @param {{ position: THREE.Vector3, lookAt: THREE.Vector3 }} view
+   * @param {{ position: THREE.Vector3, lookAt: THREE.Vector3, distance?: number }} view
    */
   pickUp(view) {
     if (this.isHeld()) return;
     this.root.updateWorldMatrix(true, false);
     this._from.position.copy(this.root.getWorldPosition(new THREE.Vector3()));
     this._from.quaternion.copy(this.root.getWorldQuaternion(new THREE.Quaternion()));
-    let scene = this.home;
-    while (scene.parent) scene = scene.parent;
-    scene.attach(this.root);  // Into the scene itself, so it moves in world space
+    this._intoScene();
 
     const look = new THREE.Matrix4().lookAt(view.position, view.lookAt, new THREE.Vector3(0, 1, 0));
     const facing = new THREE.Quaternion().setFromRotationMatrix(look);
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(facing);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(facing);
-    this._to.position.copy(view.position).addScaledVector(forward, HOLD_DISTANCE).addScaledVector(up, -0.15);
+    this._to.position.copy(view.position).addScaledVector(forward, view.distance ?? HOLD_DISTANCE).addScaledVector(up, -0.15);
     const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), HOLD_TILT);
     this._to.quaternion.copy(facing).multiply(tilt);
     this._t = 0;
@@ -117,6 +192,8 @@ export class DeskClock {
     this._t = 0;
     this._target = 0;
     this._press = 0;
+    this._grip = null;
+    this._dropping = false;
     this.snooze.position.y = this._snoozeRest;
   }
 
@@ -132,6 +209,29 @@ export class DeskClock {
       this._press = Math.max(0, this._press - delta);
       this.snooze.position.y = this._snoozeRest - (this._press > 0 ? PRESS_DEPTH : 0);
     }
+    if (this._grip) {
+      // Follow the hand, and remember how it moves for when it is let go
+      this._grip.updateWorldMatrix(true, false);
+      new THREE.Matrix4().multiplyMatrices(this._grip.matrixWorld, this._gripOffset)
+        .decompose(this.root.position, this.root.quaternion, this.root.scale);
+      if (delta > 0) {
+        const moved = this.root.position.clone().sub(this._lastPosition).divideScalar(delta);
+        this._velocity.lerp(moved, 0.5);
+      }
+      this._lastPosition.copy(this.root.position);
+      return;
+    }
+    if (this._dropping) {
+      const result = this._drop.update(delta);
+      this.root.position.copy(this._drop.position);
+      this.root.quaternion.copy(this._drop.quaternion);
+      if (result === 'returned') this.reset();
+      if (result === 'landed') {
+        this._dropping = false;
+        this.home.attach(this.root); // Back in the room, where it landed
+      }
+      return;
+    }
     if (this._t === this._target) return;
     const step = delta / MOVE_TIME;
     this._t = this._target > this._t ? Math.min(1, this._t + step) : Math.max(0, this._t - step);
@@ -142,24 +242,19 @@ export class DeskClock {
   }
 
   /**
-   * Whether a mouse event is on the clock, or only on its snooze bar
+   * Whether a ray (the mouse's or a VR controller's) is on the clock, or only on its snooze bar
    */
-  isAt(event) {
-    return this._hit(event, this._parts);
+  isAt(ray) {
+    return this._hit(ray, this._parts);
   }
 
-  isSnoozeAt(event) {
-    return this._hit(event, [this.snooze, this.snooze.getObjectByName('br_clock_snooze_label')]);
+  isSnoozeAt(ray) {
+    return this._hit(ray, [this.snooze, this.snooze.getObjectByName('br_clock_snooze_label')]);
   }
 
-  _hit(event, objects) {
+  _hit(ray, objects) {
     if (!this.root.visible || !this.home.visible) return false;
-    const rect = this.canvas.getBoundingClientRect();
-    const pointer = new THREE.Vector2(
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1
-    );
-    this._raycaster.setFromCamera(pointer, this.camera);
+    this._raycaster.ray.copy(ray);
     return this._raycaster.intersectObjects(objects.filter(Boolean), false).length > 0;
   }
 }

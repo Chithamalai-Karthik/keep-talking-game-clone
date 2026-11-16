@@ -5,6 +5,7 @@
    ============================================================ */
 
 import * as THREE from 'three';
+import { Drop } from './Drop.js';
 
 // Interaction states
 export const BOMB_STATE = {
@@ -14,13 +15,9 @@ export const BOMB_STATE = {
   PUTTING_DOWN: 'putting-down',
   MODULE_FOCUSED: 'module-focused',
   MODULE_UNFOCUSING: 'module-unfocusing',
+  GRABBED: 'grabbed',             // VR: held in a hand, which moves and turns it
+  FALLING: 'falling',             // VR: let go of, falling back to the desk
 };
-
-// Pixels the mouse must move before a press counts as a drag
-const DRAG_THRESHOLD = 5;
-
-// The right button rotates when dragged and deselects when clicked
-const RIGHT_BUTTON = 2;
 
 export class BombController {
   constructor(bombGroup, camera) {
@@ -34,6 +31,10 @@ export class BombController {
     // Desk surface top = 0.56, bomb depth/2 when flat = 0.45 → center at 1.01
     this.tablePosition = new THREE.Vector3(0, 1.01, 0);
     this.tableRotation = new THREE.Euler(-Math.PI / 2, 0, 0);
+    // Where it lies now: the table spot, or wherever it landed when dropped in VR
+    this.restPosition = this.tablePosition.clone();
+    this.restRotation = this.tableRotation.clone();
+    this._drop = null;
 
     // Held: bomb floats in front of camera, standing upright
     // bomb height/2 = 1.1, give some clearance above desk
@@ -47,11 +48,7 @@ export class BombController {
     this.cameraHeldLookAt = new THREE.Vector3(0, 3, 0);
 
     // --- Mouse drag rotation state ---
-    this._isDragging = false;
-    this._isPressed = false;
-    this._wasDragged = false;
-    this._pressStart = new THREE.Vector2();
-    this._previousMouse = new THREE.Vector2();
+    this._isDragging = false;   // Turning by hand (a right-drag or a thumbstick) right now
     this._targetRotation = new THREE.Euler(0, 0, 0);
     this._currentRotation = new THREE.Euler(0, 0, 0);
     this._rotationVelocity = new THREE.Vector2(0, 0);
@@ -81,13 +78,14 @@ export class BombController {
     this._anim = null;
     this._cameraAnim = null;
     this._isDragging = false;
-    this._isPressed = false;
-    this._wasDragged = false;
     this._focusedSlotId = null;
     this._targetRotation.set(0, 0, 0);
     this._currentRotation.set(0, 0, 0);
     this._rotationVelocity.set(0, 0);
 
+    this.restPosition.copy(this.tablePosition);
+    this.restRotation.copy(this.tableRotation);
+    if (this._drop) this._drop.phase = 'still'; // Stop any fall still in progress
     this.bomb.position.copy(this.tablePosition);
     this.bomb.rotation.copy(this.tableRotation);
 
@@ -96,34 +94,18 @@ export class BombController {
   }
 
   /* ----------------------------------------------------------
-     MOUSE EVENTS — Call from main.js
+     ROTATION — from GameInput's rotate actions (a right-drag
+     with the mouse, or a VR thumbstick), in drag pixels
   ---------------------------------------------------------- */
 
-  onMouseDown(event) {
-    if (event.button !== RIGHT_BUTTON) return;
-
-    this._isPressed = true;
-    this._wasDragged = false;
-    this._pressStart.set(event.clientX, event.clientY);
-
-    if (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED) return;
-
-    this._isDragging = true;
-    this._previousMouse.set(event.clientX, event.clientY);
+  rotateStart() {
+    this._isDragging = this.state === BOMB_STATE.HELD || this.state === BOMB_STATE.MODULE_FOCUSED;
     this._rotationVelocity.set(0, 0);
   }
 
-  onMouseMove(event) {
-    if (this._isPressed && !this._wasDragged) {
-      const moved = Math.hypot(event.clientX - this._pressStart.x, event.clientY - this._pressStart.y);
-      this._wasDragged = moved > DRAG_THRESHOLD;
-    }
-
-    if (!this._isDragging || !this._wasDragged) return;
+  rotateBy(deltaX, deltaY) {
+    if (!this._isDragging) return;
     if (this.state !== BOMB_STATE.HELD && this.state !== BOMB_STATE.MODULE_FOCUSED) return;
-
-    const deltaX = event.clientX - this._previousMouse.x;
-    const deltaY = event.clientY - this._previousMouse.y;
 
     // Horizontal drag → Y rotation (spin left/right)
     this._targetRotation.y += deltaX * this._dragSensitivity;
@@ -141,20 +123,84 @@ export class BombController {
       deltaX * this._dragSensitivity,
       deltaY * this._dragSensitivity
     );
+  }
 
-    this._previousMouse.set(event.clientX, event.clientY);
+  rotateEnd() {
+    this._isDragging = false;
+  }
+
+  /* ----------------------------------------------------------
+     GRAB — VR: the bomb held in a hand, following it each frame
+  ---------------------------------------------------------- */
+
+  /**
+   * Take the bomb into a hand, from the desk or from being held up
+   */
+  grab() {
+    if (this.state === BOMB_STATE.GRABBED) return false;
+    clearTimeout(this._unfocusTimeout);
+    this._anim = null;
+    this._cameraAnim = null;
+    this._isDragging = false;
+    this._focusedSlotId = null;
+    this.state = BOMB_STATE.GRABBED;
+    return true;
   }
 
   /**
-   * @returns {boolean} — true if the right button was clicked, not dragged
+   * Move the grabbed bomb to the hand's pose
    */
-  onMouseUp(event) {
-    if (event.button !== RIGHT_BUTTON) return false;
+  holdAt(position, quaternion) {
+    if (this.state !== BOMB_STATE.GRABBED) return;
+    this.bomb.position.copy(position);
+    this.bomb.quaternion.copy(quaternion);
+  }
 
-    const clicked = this._isPressed && !this._wasDragged;
-    this._isDragging = false;
-    this._isPressed = false;
-    return clicked;
+  /**
+   * Where a dropped bomb can land: the desk's area, in game units
+   * @param {object} area
+   * @param {{ minX: number, maxX: number, minZ: number, maxZ: number }} area.bounds - where its centre can come down
+   * @param {number} area.floorY - below this it has missed the desk
+   * @param {number} area.deskTop - the desk's surface
+   * @param {{ x: number, y: number, z: number }} area.halfSize - half the bomb's size, so it lands on the face it falls on
+   */
+  setDropArea({ bounds, floorY, deskTop, halfSize }) {
+    this._drop = new Drop({
+      restY: this.tablePosition.y,
+      deskTop,
+      halfExtents: new THREE.Vector3(halfSize.x, halfSize.y, halfSize.z),
+      bounds,
+      floorY,
+      flat: new THREE.Quaternion().setFromEuler(this.tableRotation),
+      home: { position: this.tablePosition, quaternion: new THREE.Quaternion().setFromEuler(this.tableRotation) },
+    });
+  }
+
+  /**
+   * Let go: the bomb falls with the hand's motion and lands where it comes down on the desk,
+   * or goes back to its place if it misses
+   * @param {THREE.Vector3} [velocity] - the hand's motion, in game units per second
+   */
+  release(velocity = new THREE.Vector3(), callback = null) {
+    if (this.state !== BOMB_STATE.GRABBED) return;
+    if (this._drop) {
+      this.state = BOMB_STATE.FALLING;
+      this._afterDrop = callback;
+      this._drop.start(this.bomb.position, this.bomb.quaternion, velocity);
+      return;
+    }
+    this.state = BOMB_STATE.PUTTING_DOWN;
+    this._animateBomb(
+      { position: this.bomb.position.clone(), rotation: this.bomb.rotation.clone() },
+      { position: this.restPosition.clone(), rotation: this.restRotation.clone() },
+      0.6,
+      () => {
+        this.state = BOMB_STATE.ON_TABLE;
+        this._targetRotation.set(0, 0, 0);
+        this._currentRotation.set(0, 0, 0);
+        callback?.();
+      }
+    );
   }
 
   /* ----------------------------------------------------------
@@ -175,8 +221,8 @@ export class BombController {
     // Animate bomb from table to held position
     this._animateBomb(
       {
-        position: this.tablePosition.clone(),
-        rotation: this.tableRotation.clone(),
+        position: this.bomb.position.clone(),
+        rotation: this.bomb.rotation.clone(),
       },
       {
         position: this.heldPosition.clone(),
@@ -216,8 +262,8 @@ export class BombController {
         rotation: this.bomb.rotation.clone(),
       },
       {
-        position: this.tablePosition.clone(),
-        rotation: this.tableRotation.clone(),
+        position: this.restPosition.clone(),
+        rotation: this.restRotation.clone(),
       },
       0.8,
       () => {
@@ -401,7 +447,7 @@ export class BombController {
       }
     }
 
-    // --- Mouse-drag rotation (held or focused, no animation running) ---
+    // --- Turning by hand (held or focused, no animation running) ---
     if ((this.state === BOMB_STATE.HELD || this.state === BOMB_STATE.MODULE_FOCUSED) && !this._anim) {
       // Apply momentum when not dragging
       if (!this._isDragging) {
@@ -423,10 +469,28 @@ export class BombController {
       this.bomb.rotation.set(this._currentRotation.x, this._currentRotation.y, 0);
     }
 
+    // --- VR: let go of, falling back to the desk ---
+    if (this.state === BOMB_STATE.FALLING && this._drop) {
+      const result = this._drop.update(delta);
+      this.bomb.position.copy(this._drop.position);
+      this.bomb.quaternion.copy(this._drop.quaternion);
+      if (result === 'landed' || result === 'returned') {
+        this.restPosition.copy(this.bomb.position);
+        this.restRotation.copy(this.bomb.rotation);
+        this.state = BOMB_STATE.ON_TABLE;
+        this._targetRotation.set(0, 0, 0);
+        this._currentRotation.set(0, 0, 0);
+        const done = this._afterDrop;
+        this._afterDrop = null;
+        done?.();
+      }
+      return;
+    }
+
     // --- Subtle idle float when on table ---
     if (this.state === BOMB_STATE.ON_TABLE) {
       const elapsed = performance.now() * 0.001;
-      this.bomb.position.y = this.tablePosition.y + Math.sin(elapsed * 0.8) * 0.01;
+      this.bomb.position.y = this.restPosition.y + Math.sin(elapsed * 0.8) * 0.01;
     }
   }
 
@@ -439,10 +503,10 @@ export class BombController {
   }
 
   /**
-   * True if the last mouse press moved far enough to be a drag, not a click
+   * True while the bomb is being turned by hand
    */
-  wasDragged() {
-    return this._wasDragged;
+  isRotating() {
+    return this._isDragging;
   }
 
   /**

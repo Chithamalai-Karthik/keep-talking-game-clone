@@ -181,14 +181,13 @@ export function drawContents(ctx, w, h, hovered = null) {
   LEVELS.forEach((level, i) => {
     const y = 340 + i * 100;
     const config = DIFFICULTY[level.id];
-    const isHovered = hovered === level.id;
-    text(ctx, level.number, 100, y, 46);
-    const width = text(ctx, config.label, 205, y, 46);
-    text(ctx, `${config.modules - config.needy} modules`, w - 70, y, 28, { align: 'right', colour: FADED_INK });
-    if (isHovered) {
-      ctx.fillStyle = INK;
-      ctx.fillRect(205, y + 10, width, 4);
+    if (hovered === `level:${level.id}`) {
+      ctx.fillStyle = HOVER;
+      ctx.fillRect(70, y - 56, w - 140, 80);
     }
+    text(ctx, level.number, 100, y, 46);
+    text(ctx, config.label, 205, y, 46);
+    text(ctx, `${config.modules - config.needy} modules`, w - 90, y, 28, { align: 'right', colour: FADED_INK });
     regions.push({ id: `level:${level.id}`, x: 80, y: y - 60, w: w - 140, h: 88 });
   });
 
@@ -218,11 +217,12 @@ export function drawLevel(ctx, w, h, id, hovered = null) {
     y += 78;
   }
 
-  const start = stampButton(ctx, 'START', w / 2, h - 210, hovered === 'start');
-  const backWidth = text(ctx, '< Contents', 70, h - 110, 32, { colour: hovered === 'back' ? INK : FADED_INK });
+  // Back to the contents to choose another level, or start this one
+  const back = stampButton(ctx, 'BACK', w * 0.3, h - 150, hovered === 'back');
+  const start = stampButton(ctx, 'START', w * 0.7, h - 150, hovered === 'start');
   return [
-    { id: 'start', ...start },
-    { id: 'back', x: 60, y: h - 145, w: backWidth + 30, h: 50 },
+    { id: 'back', style: 'frame', ...back },
+    { id: 'start', style: 'frame', ...start },
   ];
 }
 
@@ -344,6 +344,13 @@ function menuLine(ctx, w, y, item, hovered) {
 }
 
 /**
+ * A menu sheet's choices, with Leave VR added while the player is in VR
+ */
+export function menuFor(menu, inVR) {
+  return inVR ? { ...menu, items: [...menu.items, { id: 'leave-vr', label: 'Leave VR' }] } : menu;
+}
+
+/**
  * A menu sheet: what can be done from here
  */
 export function drawMenuSheet(ctx, w, h, hovered = null, menu = OFFICE_MENU) {
@@ -383,7 +390,7 @@ export function drawSoundSheet(ctx, w, h, hovered = null, volume = 1) {
   const up = arrowButton(ctx, w - 220, 440, '>', hovered === 'volume-up');
   text(ctx, `${Math.round(volume * 100)}%`, w / 2, 502, 58, { align: 'center' });
   const back = menuLine(ctx, w, 720, { id: 'sound-back', label: 'Back' }, hovered);
-  return [{ id: 'volume-down', ...down }, { id: 'volume-up', ...up }, back];
+  return [{ id: 'volume-down', style: 'frame', ...down }, { id: 'volume-up', style: 'frame', ...up }, back];
 }
 
 /* ----------------------------------------------------------
@@ -462,7 +469,7 @@ export function drawResults(ctx, w, h, game, hovered = null) {
 
   const back = stampButton(ctx, 'BACK', w * 0.3, h - 120, hovered === 'results-back');
   const retry = stampButton(ctx, 'RETRY', w * 0.7, h - 120, hovered === 'retry');
-  return [{ id: 'results-back', ...back }, { id: 'retry', ...retry }];
+  return [{ id: 'results-back', style: 'frame', ...back }, { id: 'retry', style: 'frame', ...retry }];
 }
 
 /**
@@ -598,7 +605,7 @@ export function drawFreePlayControls(ctx, w, h, settings, hovered = null) {
     ctx.fillRect(510, y - 37, 180, 74);
     text(ctx, value, 600, y + 20, 56, { font: '"Courier New", monospace', weight: 'bold', colour: DIGITS, align: 'center' });
     const up = arrowKey(ctx, 702, y - 37, false, hovered === `fp-${id}-up`);
-    regions.push({ id: `fp-${id}-down`, ...down }, { id: `fp-${id}-up`, ...up });
+    regions.push({ id: `fp-${id}-down`, style: 'frame', ...down }, { id: `fp-${id}-up`, style: 'frame', ...up });
   }
 
   // Hazard-striped box with the two switches
@@ -613,8 +620,8 @@ export function drawFreePlayControls(ctx, w, h, settings, hovered = null) {
     ctx.fill();
   }
   ctx.restore();
-  regions.push({ id: 'fp-needy', ...toggle(ctx, 115, 638, 'NEEDY', settings.needy, hovered === 'fp-needy') });
-  regions.push({ id: 'fp-hardcore', ...toggle(ctx, 115, 748, 'HARDCORE', settings.hardcore, hovered === 'fp-hardcore') });
+  regions.push({ id: 'fp-needy', style: 'frame', ...toggle(ctx, 115, 638, 'NEEDY', settings.needy, hovered === 'fp-needy') });
+  regions.push({ id: 'fp-hardcore', style: 'frame', ...toggle(ctx, 115, 748, 'HARDCORE', settings.hardcore, hovered === 'fp-hardcore') });
 
   // Vent grille and the big red START button
   plate(ctx, 90, 930, 280, 220, '#2b2f35');
@@ -630,7 +637,7 @@ export function drawFreePlayControls(ctx, w, h, settings, hovered = null) {
   ctx.closePath(); ctx.fill();
   ctx.strokeStyle = '#8f140e'; ctx.lineWidth = 8; ctx.stroke();
   text(ctx, 'START', cx, cy + 22, 60, { font: PANEL_FONT, colour: '#ffffff', align: 'center' });
-  regions.push({ id: 'fp-start', x: cx - r, y: cy - r, w: r * 2, h: r * 2 });
+  regions.push({ id: 'fp-start', style: 'frame', x: cx - r, y: cy - r, w: r * 2, h: r * 2 });
   return regions;
 }
 

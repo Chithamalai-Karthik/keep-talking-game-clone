@@ -1,33 +1,44 @@
 /* ============================================================
-   SceneManager.js — Three.js Scene Setup
-   Creates and manages the Three.js scene, camera, renderer, lights
+   SceneManager.js — The scene, camera, renderer and lights
+   Built on Meta's Immersive Web SDK (IWSDK): its World makes the
+   renderer, scene, camera and render loop, ready for VR later.
+   The game's look is set here on top of it (tone mapping,
+   shadows, background and lights), so it looks as it always has.
    ============================================================ */
 
 import * as THREE from 'three';
+import { World, SessionMode, createSystem } from '@iwsdk/core';
 
 export class SceneManager {
-  constructor(container) {
-    this.container = container;
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
+  /**
+   * Make the IWSDK world in a container, then the game's scene settings
+   * @param {HTMLElement} container
+   * @returns {Promise<SceneManager>}
+   */
+  static async create(container) {
+    const world = await World.create(container, {
+      // VR is ready but not offered yet: the Enter VR button comes in a later part
+      xr: { sessionMode: SessionMode.ImmersiveVR, offer: 'none' },
+      render: { fov: 50, near: 0.1, far: 100 },
+      // The game reads the mouse itself (Raycaster, BombController, DeskMenu)
+      input: { canvasPointerEvents: false },
+      features: { spatialUI: false, locomotion: false, grabbing: false },
+    });
+    return new SceneManager(world);
+  }
 
-    // Scene
-    this.scene = new THREE.Scene();
+  /**
+   * @param {World} world - an IWSDK world from World.create
+   */
+  constructor(world) {
+    this.world = world;
+    this.scene = world.scene;
+    this.camera = world.camera;
+    this.renderer = world.renderer;
+
     this.scene.background = new THREE.Color(0x0a0a14);
     this.scene.fog = new THREE.FogExp2(0x0a0a14, 0.015);
 
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(50, this.width / this.height, 0.1, 100);
-    this.camera.position.set(0, 3, 5);
-    this.camera.lookAt(0, 0.5, 0);
-
-    // Renderer
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: false,
-      powerPreference: 'high-performance',
-    });
-    this.renderer.setSize(this.width, this.height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -35,17 +46,10 @@ export class SceneManager {
     this.renderer.toneMappingExposure = 1.2;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    container.appendChild(this.renderer.domElement);
+    this.camera.position.set(0, 3, 5);
+    this.camera.lookAt(0, 0.5, 0);
 
-    // Timer (replaces deprecated THREE.Clock)
-    this.timer = new THREE.Timer();
-    this.timer.connect(document);
-
-    // Lights
     this._setupLights();
-
-    // Handle resize
-    window.addEventListener('resize', () => this._onResize());
   }
 
   _setupLights() {
@@ -101,32 +105,17 @@ export class SceneManager {
     this.mainLight.shadow.radius = shadowRadius;
   }
 
-  _onResize() {
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
-    this.camera.aspect = this.width / this.height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(this.width, this.height);
-  }
-
   /**
-   * Main render loop — call from requestAnimationFrame
-   * @param {Function} updateCallback - Called each frame with delta time
+   * Run the game's per-frame update inside IWSDK's render loop, as a system
+   * @param {(delta: number, elapsed: number) => void} updateCallback
    */
   animate(updateCallback) {
-    const loop = (timestamp) => {
-      requestAnimationFrame(loop);
-      this.timer.update(timestamp);
-      const delta = this.timer.getDelta();
-      const elapsed = this.timer.getElapsed();
-
-      if (updateCallback) {
-        updateCallback(delta, elapsed);
+    const GameLoopSystem = class extends createSystem() {
+      update(delta, time) {
+        updateCallback(delta, time);
       }
-
-      this.renderer.render(this.scene, this.camera);
     };
-    requestAnimationFrame(loop);
+    this.world.registerSystem(GameLoopSystem);
   }
 
   /**
@@ -144,7 +133,6 @@ export class SceneManager {
   }
 
   dispose() {
-    this.renderer.dispose();
-    window.removeEventListener('resize', this._onResize);
+    this.world.destroy?.();
   }
 }

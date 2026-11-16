@@ -1,7 +1,7 @@
 # Talk to Defuse roadmap
 
 The plan for this project: what is built, what comes next and why. The project board (`board/`) shows it as a kanban
-board: `python board/serve.py`. Format: `board/FORMAT.md`. Last updated 13 November 2026.
+board: `python board/serve.py`. Format: `board/FORMAT.md`. Last updated 16 November 2026.
 
 ## About the project
 
@@ -185,12 +185,12 @@ Step 46 is built in parts:
 
 | Part | What | Effort | Due | Status |
 | --- | --- | --- | --- | --- |
-| 46a | Move the game onto IWSDK and its Three.js build, with the desktop game unchanged. | M | 2027-04-04 | Next |
-| 46b | Separate input from the mouse, so clicks and VR drive the same game actions. | M | 2027-04-10 | Not started |
-| 46c | Enter and leave VR, from the menu and during a game, with the button only on supported devices. | S | 2027-04-11 | Not started |
-| 46d | The VR room: desk height, where the player stands, and real-world scale. | M | 2027-04-18 | Not started |
-| 46e | Pick up, hold and rotate the bomb with controllers and with hands. | M | 2027-04-24 | Not started |
-| 46f | Use every module with controllers and hands, including held parts, wires, dials and small buttons. | L | 2027-05-01 | Not started |
+| 46a | Move the game onto IWSDK and its Three.js build, with the desktop game unchanged. | M | 2027-04-04 | Done 2026-11-13 |
+| 46b | Separate input from the mouse, so clicks and VR drive the same game actions. | M | 2027-04-10 | Done 2026-11-13 |
+| 46c | Enter and leave VR, from the menu and during a game, with the button only on supported devices. | S | 2027-04-11 | Done 2026-11-16 |
+| 46d | The VR room: desk height, where the player stands, and real-world scale. | M | 2027-04-18 | Done 2026-11-16 |
+| 46e | Pick up, hold and rotate the bomb with controllers and with hands. | M | 2027-04-24 | In progress |
+| 46f | Use every module with controllers and hands, including held parts, wires, dials and small buttons. | L | 2027-05-01 | In progress |
 | 46g | A new menu matching the original game's, shared by the browser and VR, with difficulty, hints and game over. | L | 2027-05-08 | Done 2026-11-13 |
 | 46h | Sound placed in the room, and vibration on presses and strikes. | S | 2027-05-09 | Not started |
 | 46i | Headset performance: frame rate, shadows and sharp text. | M | 2027-05-16 | Not started |
@@ -210,6 +210,19 @@ Decisions for Phase G:
 - Controllers and hands both come in the first version (2026-11-02, the user's decision), as IWSDK supports both.
 - The first VR version has the Expert in the same room, with voice chat from the headset later as step 47 (2026-11-02, agreed with the user).
 - VR comes before voice chat and release (2026-11-02, the user's decision, replacing the earlier plan to do it after release). Voice chat and release move back eight weekends, and the end date moves from 2027-06-06 to 2027-07-17.
+- Part 46a done (2026-11-13): `three` is now `super-three` 0.181 (pinned with an npm override so IWSDK and the game share one copy), with `@iwsdk/core` 1.0.1 and Vite 7. `SceneManager` gets the renderer, scene, camera and loop from `World.create` and sets the game's tone mapping, shadows, background and lights on them, so the look is unchanged; the game's update runs as an IWSDK system. IWSDK's canvas pointer events, spatial UI, locomotion and grabbing are off, and XR is enabled but not offered. The game keeps importing `three` (the same copy IWSDK uses) instead of rewriting every import to `@iwsdk/core`. The IWSDK CLI dev server and its Vite plugin are left for part 46c, when the headset is first needed; `npm run dev` is still plain Vite.
+- Part 46b done (2026-11-13): `GameInput` turns the mouse and VR controllers into the same actions, each carrying a ray: point, press, release, select, back and rotate. The bomb's raycaster, `main.js`, the desk menu and the desk clock all listen there instead of to the mouse. Mouse: left button press, release and click; a right click is back, a right-drag turns the bomb; Esc is back. VR (my first mapping, to be tried on the headset from part 46c): the trigger is press, release and select along that hand's ray, B or Y is back, and the thumbstick turns the held bomb; picking the bomb up by hand comes in 46e.
+- A loader covers the page while the 3D scene loads (2026-11-13, the user's request): a bomb with a fuse, the spark burning towards it as the world, rooms and desk props load, then the bomb blasts in a flash that fades to the office. It is in `index.html` itself, so it shows before any script runs, and it shows for at least 1.6 seconds so the spark is seen.
+- Part 46c (2026-11-13): the Enter VR button shows only when `navigator.xr` supports immersive VR, at the bottom right on the menu and during a game; Leave VR is added to both folders' menus in VR. In VR the player's rig is scaled by ROOM_SCALE (8), so the rooms are real size, and stands on the floor behind the desk of the room showing, moving with the room. Held props and the clock come to the player's eyes. Headset testing uses `adb reverse` and Meta's `metavr capture screenshot` (from the TCS project), as plain screencap is blank on the Quest; IWSDK's managed dev server isn't needed for this.
+- VR interaction, tried on the headset with the user (2026-11-16):
+  - Each controller has a beam that stops at the first surface it meets, with a dot there (the user's request: a pointer was needed to aim).
+  - The grip grabs the bomb or the alarm clock only when the hand is within about 10 cm of it, never from afar (the user's decision), and keeps the pose it was grabbed in, with no snap. Let go, it falls with the hand's motion; on the desk the bomb settles onto whichever face is nearest facing down, turning only as much as that takes, and anything that misses the desk goes back to its place (the user's decisions). With the bomb in a hand, the other hand's trigger works the modules straight away, with no focus step. The thumbstick no longer turns the bomb.
+  - The alarm clock is grabbed like the bomb, and the trigger on its snooze bar snoozes it, on the desk or in the hand (the user's request).
+  - In VR the bomb room's folder and the clock come to the same reading distance as the office props, at full size (the user found them too close).
+  - Hover on the desk props' pages is a highlight shape over the page (a highlighter-yellow fill, or a frame round dark buttons), not a redraw of the page: measured on the headset, each redraw cost about two frames in the bomb room, which showed as flicker, and the highlight costs none.
+  - The levels get the highlight, and a level's page has BACK and START stamps (the user's request).
+  - Testing from the laptop: `metavr capture screenshot` for the headset's view, and remote debugging of the Quest browser (`adb forward tcp:9222 localabstract:chrome_devtools_remote`) to read the game's state and measure frame times. The dev server listens on 127.0.0.1, which `adb reverse` reaches.
+- Still to do in 46e and 46f: hand tracking (no controllers), and checking every module's small parts with the beam.
 - Check VR directly on the headset connected to the laptop (2026-11-02, the user's way of working): the user's TCS CSR Family Day VR project already does this. It uses the `iwsdk-runtime`, `iwsdk-reference` and `metavr` MCP servers in `.mcp.json`, adb over USB with `adb reverse tcp:8081 tcp:8081`, and `runtime pair-headset`. Copy that setup from its `AGENTS.md` and `DESIGN.md`. The agent checks in the headset, then the user reviews.
 
 ## Phase E: voice chat and rooms

@@ -4,13 +4,17 @@
    pick-up/put-down states, and game orchestration
    ============================================================ */
 
+import * as THREE from 'three';
 import { SceneManager } from './three/SceneManager.js';
-import { BombModel } from './three/BombModel.js';
+import { BombModel, BOMB_HALF_SIZE } from './three/BombModel.js';
 import { createOffice, createBombRoom } from './three/Rooms.js';
-import { DeskMenu } from './menu/DeskMenu.js';
+import { DeskMenu, MENU_CAMERA } from './menu/DeskMenu.js';
+import { VrMode } from './xr/VrMode.js';
 import { BombController, BOMB_STATE } from './three/BombController.js';
 import { Raycaster } from './three/Raycaster.js';
+import { GameInput } from './input/GameInput.js';
 import { MenuUI } from './ui/MenuUI.js';
+import { Loader } from './ui/Loader.js';
 import { DIFFICULTY, MODULE_NAMES, strikeSpeed } from './utils/constants.js';
 import { displayTime, formatTime } from './utils/helpers.js';
 import { playSound, unlockAudio, setEffectsVolume } from './audio/Sounds.js';
@@ -37,6 +41,16 @@ import './game/CapacitorModule.js';
 import './game/KnobModule.js';
 
 const FADE_MS = 350;
+const VR_CLOCK_DISTANCE = 3.6;   // Game units: about 45 cm from the eyes
+const VR_REACH = 0.8;            // Game units: a hand within about 10 cm of something can grab it
+
+// The bomb room's desk, in game units: where dropped things can land in VR
+const BOMB_DESK = {
+  top: 0.56,
+  floor: -5,
+  bombBounds: { minX: -4.2, maxX: 4.2, minZ: -2.3, maxZ: 2.3 },   // The bomb's centre, so it stays on the 1.4 x 0.8 m desk
+  clockBounds: { minX: -5.2, maxX: 5.2, minZ: -2.9, maxZ: 2.9 },
+};
 
 /**
  * Fade the screen to black or back, for moving between rooms
@@ -47,6 +61,16 @@ function fadeScreen(toBlack, instant = false) {
   fade.classList.toggle('instant', instant);
   fade.classList.toggle('black', toBlack);
   return new Promise(resolve => setTimeout(resolve, instant ? 0 : FADE_MS));
+}
+
+/**
+ * Whether an object can be seen: it and everything above it are visible
+ */
+function isShown(object) {
+  for (let node = object; node; node = node.parent) {
+    if (!node.visible) return false;
+  }
+  return true;
 }
 
 class App {
@@ -67,6 +91,11 @@ class App {
     this.bombState = null;
     this.alarm = null;               // The desk clock's alarm, during a game
     this.deskClock = null;           // The clock itself, which can be picked up
+    this._grabHand = null;           // VR: 'left' or 'right' while that hand grips the bomb
+    this._clockHand = null;          // VR: the hand gripping the desk clock
+    this._grabVelocity = null;       // VR: how the grabbed bomb is moving, for when it is let go
+    this._lastGrabPosition = null;
+    this._beamRaycaster = null;
     this.settings = loadSettings();
     this._gameOverToken = 0;         // Cancels a report still waiting to show
     this._hintTimeout = null;
@@ -84,7 +113,9 @@ class App {
     this._init();
   }
 
-  _init() {
+  async _init() {
+    // The bomb and fuse in index.html cover the page until the scene is ready
+    const loader = new Loader();
     window.addEventListener('pointerdown', unlockAudio);
     setEffectsVolume(this.settings.effectsVolume);
 
@@ -93,19 +124,20 @@ class App {
 
     // --- THREE.JS SETUP ---
     try {
-      // Setup Three.js scene
+      // The IWSDK world: renderer, scene, camera and render loop, ready for VR later
       const container = document.getElementById('canvas-container');
-      this.sceneManager = new SceneManager(container);
+      this.sceneManager = await loader.track(SceneManager.create(container));
 
       // The office holds the menu; the bomb room is where the game is played
       this.office = createOffice();
       this.bombRoom = createBombRoom();
       for (const room of [this.office, this.bombRoom]) this.sceneManager.add(room.getObject());
-      this.office.load().catch(err => console.error('[KTANE] Office failed to load:', err));
-      this.bombRoom.load()
+      loader.track(this.office.load()).catch(err => console.error('[KTANE] Office failed to load:', err));
+      loader.track(this.bombRoom.load())
         .then(() => {
           const clock = this.bombRoom.getObject().getObjectByName('br_clock_root');
-          this.deskClock = new DeskClock(clock, this.sceneManager.camera, this.sceneManager.renderer.domElement);
+          this.deskClock = new DeskClock(clock, this.sceneManager.camera);
+          this.deskClock.setDropArea({ restY: BOMB_DESK.top, bounds: BOMB_DESK.clockBounds, floorY: BOMB_DESK.floor });
         })
         .catch(err => console.error('[KTANE] Bomb room failed to load:', err));
       this.bombRoom.setVisible(false);
@@ -120,32 +152,36 @@ class App {
         this.bombModel.getObject(),
         this.sceneManager.camera
       );
+      this.bombController.setDropArea({
+        bounds: BOMB_DESK.bombBounds, floorY: BOMB_DESK.floor, deskTop: BOMB_DESK.top, halfSize: BOMB_HALF_SIZE,
+      });
 
-      // Setup raycaster
-      this.raycaster = new Raycaster(
-        this.sceneManager.camera,
-        this.sceneManager.renderer.domElement
-      );
-
-      // --- EVENT LISTENERS ---
-
-      // Mouse events for bomb rotation (delegated to BombController)
+      // Input: the mouse now, VR controllers later, as the same game actions
       const canvas = this.sceneManager.renderer.domElement;
-      canvas.addEventListener('mousedown', (e) => this._onMouseDown(e));
-      canvas.addEventListener('mousemove', (e) => this._onMouseMove(e));
-      window.addEventListener('mouseup', (e) => this._onMouseUp(e));
-      window.addEventListener('blur', () => this._releaseHeldPart());
+      this.input = new GameInput(this.sceneManager.camera, canvas);
+      this.input.attachXR(this.sceneManager.world);
 
-      // The right button rotates and deselects, so it never opens the menu
-      canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+      // The bomb's hover and clicks
+      this.raycaster = new Raycaster(this.input, canvas);
 
-      // The desk clock: a click picks it up, and a click on its bar while held is snooze
-      canvas.addEventListener('click', (e) => this._onClockClick(e));
+      // Holding module parts, turning the bomb, stepping back, and the desk clock
+      this.input.subscribe({
+        press: (e) => this._onPress(e),
+        release: () => this._releaseHeldPart(),
+        rotateStart: () => {
+          if (!this._gameOver && !this.deskMenu.isHolding() && !this.deskClock?.isHeld()) this.bombController.rotateStart();
+        },
+        rotate: ({ dx, dy }) => this.bombController.rotateBy(dx, dy),
+        rotateEnd: () => this.bombController.rotateEnd(),
+        back: () => this._deselect(),
+        select: (e) => this._onClockClick(e),
+        cancel: () => this._releaseHeldPart(),
+        grab: (e) => this._grabBomb(e),
+        drop: (e) => this._dropBomb(e),
+      });
 
-      // ESC to deselect + debug shortcuts
+      // Debug shortcuts
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') this._deselect();
-
         // --- DEBUG SHORTCUTS (development only, active game only) ---
         if (import.meta.env.DEV) {
           if (!this.isGameActive || this._gameOver) return;
@@ -192,7 +228,7 @@ class App {
 
       // --- THE MENU ON THE DESK ---
       this.bombModel.getObject().visible = false;
-      this.deskMenu = new DeskMenu(this.sceneManager.scene, this.sceneManager.camera, canvas, {
+      this.deskMenu = new DeskMenu(this.sceneManager.scene, this.sceneManager.camera, this.input, canvas, {
         onStart: (difficulty) => this._enterBombRoom(difficulty),
         onManual: () => window.open(`${import.meta.env.BASE_URL}manual.html`, '_blank'),
         onRestart: () => this._restartBomb(),
@@ -206,12 +242,19 @@ class App {
           saveSettings(this.settings);
         },
         onLift: (lifted) => this.menuUI.setTitleHidden(lifted),
+        onLeaveVR: () => this.vrMode.exit(),
         // In a game, the folder can be picked up only while the bomb is down on the desk
         canUse: () => !this.isGameActive || (!this._gameOver && !this.deskClock?.isHeld()
           && this.bombController.getState() === BOMB_STATE.ON_TABLE && !this.bombController.isAnimating()),
       });
       this.deskMenu.show(true);
-      this.deskMenu.load().catch(err => console.error('[KTANE] Menu model failed to load:', err));
+      loader.track(this.deskMenu.load()).catch(err => console.error('[KTANE] Menu model failed to load:', err));
+
+      // VR: the Enter VR button where it is supported, and the player's place in each room
+      this.vrMode = new VrMode(this.sceneManager, {
+        onEnter: () => this.deskMenu.setVR(true),
+        onExit: () => this._afterVR(),
+      });
 
       // Start render loop
       this.sceneManager.animate((delta, elapsed) => this._update(delta, elapsed));
@@ -220,13 +263,16 @@ class App {
     } catch (err) {
       console.error('[KTANE] Three.js initialization error:', err);
     }
+    // Blast the loader away once everything it tracked has loaded (or failed)
+    loader.finish();
   }
 
   /* ----------------------------------------------------------
      PER-FRAME UPDATE
   ---------------------------------------------------------- */
   _update(delta, elapsed) {
-    // The desk menu also glides the camera between the chair and the bomb
+    // VR controllers become input actions; the desk menu glides the camera
+    this.input.update(delta);
     this.deskMenu.update(delta);
     if (this.alarm && !this._gameOver) {
       const event = this.alarm.update(delta);
@@ -234,6 +280,8 @@ class App {
     }
     this.bombRoom.update(this.alarm?.displayOn ?? true);
     this.deskClock?.update(delta);
+    this._followHand(delta);
+    if (this.vrMode.active) this.vrMode.updateBeams((hand) => this.input.handRay(hand), (ray) => this._beamHit(ray));
     if (!this.isGameActive) return;
 
     this.bombController.update(delta);
@@ -339,22 +387,118 @@ class App {
   }
 
   /**
+   * VR: the grip takes what the hand is at, the bomb or the desk clock, whichever is nearer,
+   * keeping how it sits in the hand. Only within reach: nothing is grabbed from afar.
+   */
+  _grabBomb({ source }) {
+    if (!this.isGameActive || this._gameOver || !this.vrMode.active) return;
+    if (this._grabHand === source || this._clockHand === source || this.deskMenu.isHolding()) return;
+    const grip = this.sceneManager.world.player.gripSpaces?.[source];
+    if (!grip) return;
+    const hand = grip.getWorldPosition(new THREE.Vector3());
+
+    const bombGap = this._grabHand || !this.bombModel.getObject().visible ? Infinity : this._gapToBomb(hand);
+    const clockGap = this._clockHand || !this.deskClock ? Infinity : this.deskClock.gapTo(hand);
+    if (Math.min(bombGap, clockGap) > VR_REACH) return;
+
+    if (clockGap < bombGap) {
+      if (this.deskClock.grab(grip)) this._clockHand = source;
+      return;
+    }
+    if (!this.bombController.grab()) return;
+
+    const bomb = this.bombModel.getObject();
+    grip.updateWorldMatrix(true, false);
+    bomb.updateWorldMatrix(true, false);
+    this._grabOffset = new THREE.Matrix4().copy(grip.matrixWorld).invert().multiply(bomb.matrixWorld);
+    this._grabHand = source;
+    this._grabVelocity = new THREE.Vector3();
+    this._lastGrabPosition = bomb.position.clone();
+    this.bombModel.hideOutline();
+    playSound('release');
+  }
+
+  // How far a point is from the bomb's case, in game units: 0 when touching or inside it
+  _gapToBomb(point) {
+    const local = this.bombModel.getObject().worldToLocal(point.clone());
+    const h = BOMB_HALF_SIZE;
+    return Math.hypot(
+      Math.max(Math.abs(local.x) - h.x, 0),
+      Math.max(Math.abs(local.y) - h.y, 0),
+      Math.max(Math.abs(local.z) - h.z, 0)
+    );
+  }
+
+  /**
+   * VR: letting go of the grip drops what that hand holds
+   */
+  _dropBomb({ source }) {
+    if (source === this._clockHand) {
+      this._clockHand = null;
+      this.deskClock?.release();
+    }
+    if (source !== this._grabHand) return;
+    this._grabHand = null;
+    this._releaseHeldPart();
+    this.bombController.release(this._grabVelocity ?? new THREE.Vector3());
+  }
+
+  // The grabbed bomb follows its hand, keeping the pose it was grabbed in
+  _followHand(delta) {
+    if (!this._grabHand) return;
+    const grip = this.sceneManager.world.player.gripSpaces?.[this._grabHand];
+    if (!grip) return;
+    grip.updateWorldMatrix(true, false);
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    new THREE.Matrix4().multiplyMatrices(grip.matrixWorld, this._grabOffset)
+      .decompose(position, quaternion, new THREE.Vector3());
+    this.bombController.holdAt(position, quaternion);
+    if (delta > 0) {
+      const moved = position.clone().sub(this._lastGrabPosition).divideScalar(delta);
+      this._grabVelocity.lerp(moved, 0.5);
+    }
+    this._lastGrabPosition.copy(position);
+  }
+
+  // How far a VR beam goes before it meets something that can be seen, in game units
+  _beamHit(ray) {
+    this._beamRaycaster ??= new THREE.Raycaster();
+    this._beamRaycaster.ray.copy(ray);
+    const targets = [this.bombModel.getObject(), this.deskMenu.group, this.office.getObject(), this.bombRoom.getObject()];
+    if (this.deskClock && this.deskClock.root.parent?.isScene) targets.push(this.deskClock.root);
+    for (const hit of this._beamRaycaster.intersectObjects(targets, true)) {
+      if (isShown(hit.object)) return hit.distance;
+    }
+    return null;
+  }
+
+  /**
    * The desk clock: pick it up (putting the bomb down first), or press snooze while it is held
    */
-  _onClockClick(event) {
+  _onClockClick({ ray }) {
     const clock = this.deskClock;
     if (!clock || !this.isGameActive || this._gameOver || this.deskMenu.isHolding() || clock.isMoving()) return;
-    if (clock.isHeld()) {
-      if (clock.isSnoozeAt(event)) {
+    // VR: the trigger on the snooze bar presses it, whether the clock is on the desk or in a hand
+    if (this.vrMode.active) {
+      if (clock.isSnoozeAt(ray)) {
         clock.pressSnooze();
         this.alarm?.snooze();
         playSound('press');
-      } else if (!clock.isAt(event)) {
+      }
+      return;
+    }
+    if (clock.isHeld()) {
+      if (clock.isSnoozeAt(ray)) {
+        clock.pressSnooze();
+        this.alarm?.snooze();
+        playSound('press');
+      } else if (!clock.isAt(ray)) {
         clock.putDown(); // A click on the bomb, or anywhere off the clock, puts it down
       }
       return;
     }
-    if (!clock.isAt(event) || this.bombController.isAnimating() || this._heldPart) return;
+    if (!clock.isAt(ray) || this.bombController.isAnimating() || this._heldPart) return;
     const state = this.bombController.getState();
     if (state === BOMB_STATE.HELD || state === BOMB_STATE.MODULE_FOCUSED) {
       this.bombController.putDown();
@@ -362,8 +506,31 @@ class App {
     }
     this.raycaster.clearHover();
     this.bombModel.hideOutline();
+    // On screen the clock comes to the table view the camera is heading to; in VR, to the player's eyes
     const { cameraTablePosition, cameraTableLookAt } = this.bombController;
-    clock.pickUp({ position: cameraTablePosition, lookAt: cameraTableLookAt });
+    clock.pickUp(this.vrMode.active
+      ? { ...this.vrMode.headView(this.sceneManager.camera), distance: VR_CLOCK_DISTANCE }
+      : { position: cameraTablePosition, lookAt: cameraTableLookAt });
+  }
+
+  /**
+   * Back from VR to the screen: put the camera where this moment of the game wants it
+   */
+  _afterVR() {
+    if (this._grabHand) this._dropBomb({ source: this._grabHand });
+    if (this._clockHand) this._dropBomb({ source: this._clockHand });
+    const camera = this.sceneManager.camera;
+    if (!this.isGameActive) {
+      camera.position.copy(MENU_CAMERA.position);
+      camera.lookAt(MENU_CAMERA.lookAt);
+    } else {
+      const state = this.bombController.getState();
+      const held = state === BOMB_STATE.HELD || state === BOMB_STATE.MODULE_FOCUSED;
+      const c = this.bombController;
+      camera.position.copy(held ? c.cameraHeldPosition : c.cameraTablePosition);
+      camera.lookAt(held ? c.cameraHeldLookAt : c.cameraTableLookAt);
+    }
+    this.deskMenu.setVR(false);
   }
 
   /**
@@ -388,6 +555,7 @@ class App {
   }
 
   _showBombRoom() {
+    this.vrMode.setRoom('bomb');
     this.office.setVisible(false);
     this.bombRoom.setVisible(true);
     this.sceneManager.setLighting(this.bombRoom.lighting);
@@ -402,6 +570,7 @@ class App {
     this.bombModel.getObject().visible = false;
     this.bombRoom.setVisible(false);
     this.office.setVisible(true);
+    this.vrMode.setRoom('office');
     this.sceneManager.setLighting(this.office.lighting);
     this.menuUI.showMainMenu();
     this.deskMenu.show(true);
@@ -416,6 +585,8 @@ class App {
     this._gameOver = false;
     this.bombState = null;
     this.alarm = null;
+    this._grabHand = null;
+    this._clockHand = null;
     this._gameOverToken++;
     this.deskClock?.reset();
     this._heldPart = null;
@@ -549,30 +720,31 @@ class App {
   /* ----------------------------------------------------------
      MOUSE HANDLERS — Delegated to BombController
   ---------------------------------------------------------- */
-  _onMouseDown(event) {
-    if (this._gameOver || this.deskMenu.isHolding()) return;
-    if (this.deskClock?.isHeld()) {
-      if (event.button === 2) this.deskClock.putDown(); // Right click puts the clock down
-      return;
-    }
+  /**
+   * The primary button went down (left button or trigger): maybe on a part to hold
+   */
+  _onPress({ ray }) {
+    if (this._gameOver || this.deskMenu.isHolding() || this.deskClock?.isHeld()) return;
     this._ignoreClick = false;
-    if (this._pressModulePart(event)) return; // A held part must not drag the bomb
-    this.bombController.onMouseDown(event);
+    this._pressModulePart(ray);
   }
 
   /**
    * Press a part of the focused module, if the module holds parts
    * @returns {boolean} — true if a part is now held
    */
-  _pressModulePart(event) {
-    if (event.button !== 0 || this._heldPart || this.bombController.isAnimating()) return false;
-    if (this.bombController.getState() !== BOMB_STATE.MODULE_FOCUSED) return false;
+  _pressModulePart(ray) {
+    if (this._heldPart || this.bombController.isAnimating()) return false;
+    const state = this.bombController.getState();
+    const grabbed = state === BOMB_STATE.GRABBED;
+    if (state !== BOMB_STATE.MODULE_FOCUSED && !grabbed) return false;
 
-    const object = this.raycaster.pick(event);
+    const object = this.raycaster.pick(ray);
     if (object?.userData.type !== 'modulePart') return false;
 
     const { slotId, partId } = object.userData;
-    if (slotId !== this.bombController.getFocusedSlotId()) return false;
+    // With the bomb in a VR hand, any module's parts work; on screen only the focused one's
+    if (!grabbed && slotId !== this.bombController.getFocusedSlotId()) return false;
     if (!this.moduleManager.handlePartPress(slotId, partId)) return false;
 
     this._heldPart = { slotId, partId };
@@ -589,17 +761,6 @@ class App {
     this._heldPart = null;
     this._ignoreClick = true;
     if (!this._gameOver) this.moduleManager.handlePartRelease(slotId, partId);
-  }
-
-  _onMouseMove(event) {
-    if (this._gameOver) return;
-    this.bombController.onMouseMove(event);
-  }
-
-  _onMouseUp(event) {
-    if (event.button === 0) this._releaseHeldPart();
-    if (this._gameOver) return;
-    if (this.bombController.onMouseUp(event)) this._deselect();
   }
 
   /**
@@ -631,8 +792,19 @@ class App {
 
     const state = this.bombController.getState();
 
-    // STATE: Bomb on table → pick it up
+    // STATE: Bomb in a VR hand → a part is used straight away
+    if (state === BOMB_STATE.GRABBED) {
+      const grabbedSlot = this._findActiveSlotId(object);
+      if (grabbedSlot && object.userData.type === 'modulePart') {
+        this.moduleManager.handlePartClick(grabbedSlot, object.userData.partId);
+        this.raycaster.refreshHover();
+      }
+      return;
+    }
+
+    // STATE: Bomb on table → pick it up (in VR it is grabbed with the grip instead)
     if (state === BOMB_STATE.ON_TABLE) {
+      if (this.vrMode.active) return;
       this.bombController.pickUp(() => {
         this._showHint();
       });
@@ -710,6 +882,12 @@ class App {
     if (state === BOMB_STATE.HELD) {
       cursor.cursor = slotId ? 'pointer' : 'default';
       if (slotId) this.bombModel.setSlotHighlight(slotId, true);
+      return;
+    }
+
+    if (state === BOMB_STATE.GRABBED) {
+      const isPart = slotId && object.userData.type === 'modulePart';
+      if (isPart) this.moduleManager.setPartHover(slotId, object.userData.partId, true);
       return;
     }
 

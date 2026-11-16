@@ -1,16 +1,20 @@
 /* ============================================================
-   Raycaster.js — 3D Click Detection
-   Detects mouse clicks/hovers on interactive 3D objects
+   Raycaster.js — What the pointer is on, on the bomb
+   Hover and clicks for the bomb's interactive objects. The
+   pointer is a ray from GameInput: the mouse or a VR controller.
    ============================================================ */
 
 import * as THREE from 'three';
 
 export class Raycaster {
-  constructor(camera, domElement) {
-    this.camera = camera;
+  /**
+   * @param {import('../input/GameInput.js').GameInput} input
+   * @param {HTMLElement} domElement - the canvas, whose cursor is reset when hover ends
+   */
+  constructor(input, domElement) {
+    this.input = input;
     this.domElement = domElement;
     this.raycaster = new THREE.Raycaster();
-    this.mouse = new THREE.Vector2();
 
     // Registered interactive objects
     this._interactiveObjects = [];
@@ -20,15 +24,17 @@ export class Raycaster {
     this._onHoverCallback = null;
     this._onHoverLeaveCallback = null;
 
-    // Currently hovered object
+    // Currently hovered object, and the ray it was found with
     this._hoveredObject = null;
+    this._ray = new THREE.Ray();
 
-    // Event listeners
-    this._onMouseMove = this._onMouseMove.bind(this);
-    this._onClick = this._onClick.bind(this);
-
-    domElement.addEventListener('mousemove', this._onMouseMove);
-    domElement.addEventListener('click', this._onClick);
+    this._unsubscribe = input.subscribe({
+      point: ({ ray }) => {
+        this._ray.copy(ray);
+        this._updateHover();
+      },
+      select: ({ ray }) => this._onSelect(ray),
+    });
   }
 
   /**
@@ -62,14 +68,8 @@ export class Raycaster {
     this._onHoverLeaveCallback = callback;
   }
 
-  _updateMouse(event) {
-    const rect = this.domElement.getBoundingClientRect();
-    this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-  }
-
-  _getIntersection() {
-    this.raycaster.setFromCamera(this.mouse, this.camera);
+  _getIntersection(ray) {
+    this.raycaster.ray.copy(ray);
     const intersects = this.raycaster.intersectObjects(this._interactiveObjects, true);
 
     // Find the first interactive object
@@ -87,13 +87,8 @@ export class Raycaster {
     return null;
   }
 
-  _onMouseMove(event) {
-    this._updateMouse(event);
-    this._updateHover();
-  }
-
   /**
-   * Hover again under a still mouse, after what can be hovered has changed
+   * Hover again under a still pointer, after what can be hovered has changed
    */
   refreshHover() {
     if (this._hoveredObject && this._onHoverLeaveCallback) {
@@ -111,7 +106,7 @@ export class Raycaster {
   }
 
   _updateHover() {
-    const hit = this._getIntersection();
+    const hit = this._getIntersection(this._ray);
 
     if (hit) {
       if (this._hoveredObject !== hit.object) {
@@ -137,25 +132,30 @@ export class Raycaster {
   }
 
   /**
-   * Find the interactive object under a mouse event
+   * Find the interactive object along a ray
+   * @param {THREE.Ray} ray
    * @returns {THREE.Object3D|null}
    */
-  pick(event) {
-    this._updateMouse(event);
-    return this._getIntersection()?.object ?? null;
+  pick(ray) {
+    return this._getIntersection(ray)?.object ?? null;
   }
 
-  _onClick(event) {
-    this._updateMouse(event);
+  /**
+   * The interactive object along a ray and where the ray meets it
+   * @returns {{ object: THREE.Object3D, point: THREE.Vector3 }|null}
+   */
+  hit(ray) {
+    return this._getIntersection(ray);
+  }
 
-    const hit = this._getIntersection();
+  _onSelect(ray) {
+    const hit = this._getIntersection(ray);
     if (hit && this._onClickCallback) {
       this._onClickCallback(hit.object, hit.point);
     }
   }
 
   dispose() {
-    this.domElement.removeEventListener('mousemove', this._onMouseMove);
-    this.domElement.removeEventListener('click', this._onClick);
+    this._unsubscribe();
   }
 }

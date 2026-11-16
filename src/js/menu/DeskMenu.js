@@ -58,8 +58,8 @@ const PROPS = {
         mesh: 'menu_folder_sheet_right',
         draw: (p, view, hovered) => {
           if (view.folderPage === 'sound') return Pages.drawSoundSheet(p.ctx, p.w, p.h, hovered, view.volume);
-          const menu = view.folderPage === 'options' ? Pages.OPTIONS_MENU : Pages.OFFICE_MENU;
-          return Pages.drawMenuSheet(p.ctx, p.w, p.h, hovered, menu);
+          if (view.folderPage === 'options') return Pages.drawMenuSheet(p.ctx, p.w, p.h, hovered, Pages.OPTIONS_MENU);
+          return Pages.drawMenuSheet(p.ctx, p.w, p.h, hovered, Pages.menuFor(Pages.OFFICE_MENU, view.inVR));
         },
       },
     },
@@ -75,7 +75,7 @@ const PROPS = {
     pages: {
       cover: { mesh: 'menu_case_cover_art', draw: (p) => Pages.drawCaseCover(p.ctx, p.w, p.h) },
       inside: { mesh: 'menu_case_panel_left', portrait: true, draw: (p, view, hovered) => Pages.drawFreePlayControls(p.ctx, p.w, p.h, view.freePlay, hovered) },
-      main: { mesh: 'menu_case_panel_right', portrait: true, draw: (p, view, hovered) => Pages.drawFreePlayInfo(p.ctx, p.w, p.h, view.freePlay, hovered) },
+      main: { mesh: 'menu_case_panel_right', portrait: true, hoverRedraw: true, draw: (p, view, hovered) => Pages.drawFreePlayInfo(p.ctx, p.w, p.h, view.freePlay, hovered) },
     },
   },
   gameFolder: {
@@ -85,10 +85,11 @@ const PROPS = {
     hinge: 'menu_folder_hinge',
     distance: 2.3,      // In front of the bomb, which sits about 4 units from the camera
     heldScale: 0.59,    // Smaller to match: it looks the same size as the office folder
+    vrDistance: 3.9,    // In VR the bomb sits low, so the folder can be held as in the office
     pages: {
       cover: { mesh: 'menu_folder_cover_art', draw: (p) => Pages.drawFolderCover(p.ctx, p.w, p.h) },
       inside: { mesh: 'menu_folder_sheet_left', draw: (p) => Pages.drawFolderInside(p.ctx, p.w, p.h) },
-      main: { mesh: 'menu_folder_sheet_right', draw: (p, view, hovered) => Pages.drawMenuSheet(p.ctx, p.w, p.h, hovered, Pages.GAME_MENU) },
+      main: { mesh: 'menu_folder_sheet_right', draw: (p, view, hovered) => Pages.drawMenuSheet(p.ctx, p.w, p.h, hovered, Pages.menuFor(Pages.GAME_MENU, view.inVR)) },
     },
   },
 };
@@ -96,17 +97,27 @@ const DESK_TOP_M = 0.75;
 
 const smooth = (t) => t * t * (3 - 2 * t);
 
+// The hover highlight: a highlighter (multiplied, so dark ink stays dark) and a frame for dark buttons
+const HIGHLIGHT_SHARED = { side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 };
+const HIGHLIGHT = {
+  fill: new THREE.MeshBasicMaterial({
+    ...HIGHLIGHT_SHARED, color: 0xf2d530, transparent: true, premultipliedAlpha: true, blending: THREE.MultiplyBlending,
+  }),
+  frame: new THREE.MeshBasicMaterial({ ...HIGHLIGHT_SHARED, color: 0xf2c230 }),
+};
+
 export class DeskMenu {
   /**
    * @param {THREE.Scene} scene
    * @param {THREE.PerspectiveCamera} camera
-   * @param {HTMLCanvasElement} canvas
+   * @param {import('../input/GameInput.js').GameInput} input - pointing, clicks and back, from the mouse or VR
+   * @param {HTMLCanvasElement} canvas - only for the mouse cursor
    * @param {object} actions - onStart(difficulty), onManual(), onRestart(), onLeave(), onRetry(),
    *   onVolume(step) and getVolume() for Options, getFreePlay() and onFreePlayChange(settings) for the
    *   Free Play case (onStart then gets a config instead of a level name), onLift(lifted) when a prop is raised or put down,
    *   and canUse() saying whether the desk can be used now
    */
-  constructor(scene, camera, canvas, actions) {
+  constructor(scene, camera, input, canvas, actions) {
     this.scene = scene;
     this.camera = camera;
     this.canvas = canvas;
@@ -122,22 +133,18 @@ export class DeskMenu {
     this._hoveredRegion = null;
     // What the pages show: the binder's level or results, and the office folder's page
     this._view = {
-      level: null, results: null, folderPage: null,
+      level: null, results: null, folderPage: null, inVR: false,
       volume: actions.getVolume?.() ?? 1,
       freePlay: actions.getFreePlay?.() ?? { ...DEFAULT_FREE_PLAY },
     };
     this._cameraTween = null;
     this._raycaster = new THREE.Raycaster();
-    this._pointer = new THREE.Vector2();
 
-    this._onPointerMove = this._onPointerMove.bind(this);
-    this._onClick = this._onClick.bind(this);
-    this._onContextMenu = this._onContextMenu.bind(this);
-    this._onKeyDown = this._onKeyDown.bind(this);
-    canvas.addEventListener('pointermove', this._onPointerMove);
-    canvas.addEventListener('click', this._onClick);
-    canvas.addEventListener('contextmenu', this._onContextMenu);
-    window.addEventListener('keydown', this._onKeyDown);
+    input.subscribe({
+      point: (event) => this._onPointerMove(event),
+      select: (event) => this._onClick(event),
+      back: () => this._onBack(),
+    });
   }
 
   async load() {
@@ -176,6 +183,7 @@ export class DeskMenu {
       });
       for (const [name, page] of Object.entries(spec.pages)) {
         prop.pages[name] = this._makePage(root.getObjectByName(page.mesh), page.draw, page.portrait);
+        prop.pages[name].hoverRedraw = Boolean(page.hoverRedraw);
       }
       prop.outline = this._makeOutline(root, spec.rim);
       this._props[key] = prop;
@@ -223,6 +231,25 @@ export class DeskMenu {
     this._applyPose(binder);
     this._open = binder;
     this._redraw(binder, 'main');
+  }
+
+  /**
+   * In VR or not: the folders then offer Leave VR, and a prop that is up is brought to the new view
+   */
+  setVR(inVR) {
+    this._view.inVR = inVR;
+    this._redrawAll();
+    this.reface();
+  }
+
+  /**
+   * Bring a prop that is held up in front of the camera to where the camera is now
+   */
+  reface() {
+    const prop = this._open;
+    if (!prop || prop.target !== 1) return;
+    this._setHeldPose(prop);
+    this._applyPose(prop);
   }
 
   /**
@@ -325,7 +352,7 @@ export class DeskMenu {
     const lift = smooth(Math.min(1, prop.t / 0.7));
     prop.root.position.lerpVectors(prop.deskPosition, prop.heldPosition, lift);
     prop.root.quaternion.slerpQuaternions(prop.deskQuaternion, prop.heldQuaternion, lift);
-    prop.root.scale.setScalar(ROOM_SCALE * THREE.MathUtils.lerp(1, prop.spec.heldScale ?? 1, lift));
+    prop.root.scale.setScalar(ROOM_SCALE * THREE.MathUtils.lerp(1, this._heldScale(prop), lift));
     const open = smooth(Math.max(0, (prop.t - 0.3) / 0.7));
     // A binder or folder opens on its left edge; a briefcase lifts its lid on the back edge
     if (prop.spec.briefcase) prop.hinge.rotation.x = -open * OPEN_ANGLE;
@@ -340,14 +367,22 @@ export class DeskMenu {
       ? new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(
         new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0)))
       : new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-    prop.heldQuaternion.copy(this.camera.quaternion).multiply(facing);
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    const eye = this.camera.getWorldPosition(new THREE.Vector3());
+    const eyeTurn = this.camera.getWorldQuaternion(new THREE.Quaternion());
+    prop.heldQuaternion.copy(eyeTurn).multiply(facing);
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(eyeTurn);
     const hinge = prop.hinge.position.clone()
-      .multiplyScalar(ROOM_SCALE * (prop.spec.heldScale ?? 1))
+      .multiplyScalar(ROOM_SCALE * this._heldScale(prop))
       .applyQuaternion(prop.heldQuaternion);
-    prop.heldPosition.copy(this.camera.position)
-      .addScaledVector(forward, prop.spec.distance)
+    const distance = this._view.inVR ? (prop.spec.vrDistance ?? prop.spec.distance) : prop.spec.distance;
+    prop.heldPosition.copy(eye)
+      .addScaledVector(forward, distance)
       .sub(hinge);
+  }
+
+  // Shrunk only on screen, where it must fit in front of the bomb
+  _heldScale(prop) {
+    return this._view.inVR ? 1 : (prop.spec.heldScale ?? 1);
   }
 
   /* ----------------------------------------------------------
@@ -373,6 +408,8 @@ export class DeskMenu {
       if (this._open === prop) this._open = null;
       this._view.level = null;
       this._view.folderPage = null;
+      this._hoveredRegion = null;
+      this._updateHighlightOf(prop);
       this.actions.onLift?.(false);
       this._redraw(prop, 'main');
       onDown?.();
@@ -401,6 +438,8 @@ export class DeskMenu {
     } else if (id === 'restart' || id === 'leave') {
       this._closeOpen(() => (id === 'restart' ? this.actions.onRestart() : this.actions.onLeave()));
       return;
+    } else if (id === 'leave-vr') {
+      this.actions.onLeaveVR?.();
     } else if (id === 'manual') {
       this.actions.onManual();
     } else if (id === 'options' || id === 'sound') {
@@ -426,19 +465,16 @@ export class DeskMenu {
     // A page that changed loses its hover; the case's controls stay where the pointer is
     if (!id.startsWith('fp-')) this._hoveredRegion = null;
     this._redrawOpen();
+    this._updateHighlight();
   }
 
   /* ----------------------------------------------------------
      Mouse
   ---------------------------------------------------------- */
 
+  // What an input action's ray passes through, nearest first
   _hits(event, objects) {
-    const rect = this.canvas.getBoundingClientRect();
-    this._pointer.set(
-      ((event.clientX - rect.left) / rect.width) * 2 - 1,
-      -((event.clientY - rect.top) / rect.height) * 2 + 1
-    );
-    this._raycaster.setFromCamera(this._pointer, this.camera);
+    this._raycaster.ray.copy(event.ray);
     return this._raycaster.intersectObjects(objects, true);
   }
 
@@ -487,14 +523,9 @@ export class DeskMenu {
     if (prop) this._openProp(prop);
   }
 
-  _onContextMenu(event) {
-    if (!this.active) return;
-    event.preventDefault();
-    if (!this._isMoving()) this._closeOpen();
-  }
-
-  _onKeyDown(event) {
-    if (this.active && event.key === 'Escape' && !this._isMoving()) this._closeOpen();
+  // Right click, Esc, or B or Y in VR: put the open prop down
+  _onBack() {
+    if (this.active && !this._isMoving()) this._closeOpen();
   }
 
   _setHoveredProp(prop) {
@@ -507,7 +538,12 @@ export class DeskMenu {
   _setHoveredRegion(id) {
     if (this._hoveredRegion === id) return;
     this._hoveredRegion = id;
-    this._redrawOpen();
+    this._updateHighlight();
+    const prop = this._open;
+    if (!prop) return;
+    for (const [name, page] of Object.entries(prop.pages)) {
+      if (page.hoverRedraw) this._redraw(prop, name);
+    }
   }
 
   // The open prop's pages that change: the clickable one, and the main one
@@ -537,12 +573,84 @@ export class DeskMenu {
     texture.flipY = false; // glTF UVs start at the top of the page
     texture.anisotropy = 8;
     mesh.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 });
-    return { mesh, canvas, ctx: canvas.getContext('2d'), texture, draw, w, h, regions: [] };
+    const page = { mesh, canvas, ctx: canvas.getContext('2d'), texture, draw, w, h, regions: [] };
+    this._prepareHighlight(page);
+    return page;
+  }
+
+  // Hover is shown by a highlight just above the page, so the page's picture
+  // (and its upload to the GPU) doesn't change: in VR a redraw costs frames
+  _prepareHighlight(page) {
+    const geometry = page.mesh.geometry;
+    const position = geometry.attributes.position;
+    const uv = geometry.attributes.uv;
+    const corners = [];
+    for (let i = 0; i < position.count; i++) {
+      corners.push({ u: uv.getX(i), v: uv.getY(i), point: new THREE.Vector3().fromBufferAttribute(position, i) });
+    }
+    const pick = (score) => corners.reduce((best, c) => (score(c) > score(best) ? c : best)).point;
+    page.corners = {
+      c00: pick(c => -c.u - c.v), c10: pick(c => c.u - c.v), c01: pick(c => c.v - c.u), c11: pick(c => c.u + c.v),
+    };
+    page.lift = new THREE.Vector3().fromBufferAttribute(geometry.attributes.normal, 0).multiplyScalar(0.0002);
+    page.highlight = new THREE.Mesh(new THREE.BufferGeometry(), HIGHLIGHT.fill);
+    page.highlight.visible = false;
+    page.highlight.renderOrder = 2;
+    page.highlight.raycast = () => {};
+    page.mesh.add(page.highlight);
+  }
+
+  // A point on a page, from canvas pixels
+  _pagePoint(page, x, y) {
+    const u = x / page.w, v = y / page.h;
+    const { c00, c10, c01, c11 } = page.corners;
+    const top = c00.clone().lerp(c10, u);
+    const bottom = c01.clone().lerp(c11, u);
+    return top.lerp(bottom, v).add(page.lift);
+  }
+
+  // Quads over a page, each given as a canvas-pixel rectangle
+  _highlightGeometry(page, rects) {
+    const points = [];
+    for (const { x, y, w, h } of rects) {
+      const a = this._pagePoint(page, x, y), b = this._pagePoint(page, x + w, y);
+      const c = this._pagePoint(page, x + w, y + h), d = this._pagePoint(page, x, y + h);
+      points.push(a, b, c, a, c, d);
+    }
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }
+
+  // Show the open prop's hovered region: a highlighter fill on paper, a frame round a dark button
+  _updateHighlight() {
+    const prop = this._open;
+    if (!prop) return;
+    const page = prop.pages[prop.spec.clickPage ?? 'main'];
+    const region = page.regions.find(r => r.id === this._hoveredRegion);
+    page.highlight.geometry.dispose();
+    if (!region) {
+      page.highlight.visible = false;
+      page.highlight.geometry = new THREE.BufferGeometry();
+      return;
+    }
+    const { x, y, w, h } = region;
+    const frame = region.style === 'frame';
+    const t = 7; // Frame thickness, in canvas pixels
+    page.highlight.geometry = this._highlightGeometry(page, frame
+      ? [{ x: x - t, y: y - t, w: w + 2 * t, h: t }, { x: x - t, y: y + h, w: w + 2 * t, h: t },
+        { x: x - t, y, w: t, h }, { x: x + w, y, w: t, h }]
+      : [{ x, y, w, h }]);
+    page.highlight.material = frame ? HIGHLIGHT.frame : HIGHLIGHT.fill;
+    page.highlight.visible = true;
+  }
+
+  _updateHighlightOf(prop) {
+    for (const page of Object.values(prop.pages)) page.highlight.visible = false;
   }
 
   _redraw(prop, name) {
     const page = prop.pages[name];
-    page.regions = page.draw(page, this._view, this._hoveredRegion) ?? [];
+    // Only a page whose words follow the pointer (the Free Play screen) is drawn with the hover
+    page.regions = page.draw(page, this._view, page.hoverRedraw ? this._hoveredRegion : null) ?? [];
     page.texture.needsUpdate = true;
   }
 

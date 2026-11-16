@@ -12,7 +12,7 @@ A browser game inspired by Keep Talking and Nobody Explodes: one player defuses 
 
 ## How it is built
 
-Vanilla JavaScript ES modules, Three.js and Vite, with no UI framework and no backend. `main.js` owns the game flow.
+Vanilla JavaScript ES modules, Three.js and Vite, with no UI framework and no backend. The renderer, scene, camera and render loop come from Meta's Immersive Web SDK (IWSDK, `@iwsdk/core`), ready for VR; `three` is IWSDK's own build (`super-three` 0.181), kept to one copy, so import it as `three` as before. IWSDK needs Vite 7: don't upgrade Vite or `three` on their own. `main.js` owns the game flow.
 `BombState` holds one bomb's data, `BombModel` and `BombController` handle the 3D bomb, and each module registers its
 class with `ModuleManager`. Files open with a banner comment and use `_` for private members and `[KTANE]` log prefixes.
 

@@ -158,3 +158,38 @@
 #screen-fade.instant {
   transition: none;
 }
+
+/* --- Enter VR button --- */
+.vr-button {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border: 2px solid rgba(241, 236, 224, 0.85);
+  border-radius: 8px;
+  background: rgba(20, 20, 26, 0.75);
+  color: #f1ece0;
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.vr-button svg {
+  width: 30px;
+  height: 20px;
+}
+
+.vr-button:hover {
+  background: rgba(242, 194, 48, 0.9);
+  color: #1d1d1f;
+  border-color: #f2c230;
+}
+
+.vr-button[hidden] {
+  display: none;
+}
